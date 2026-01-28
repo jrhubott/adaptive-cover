@@ -9,7 +9,17 @@ This Custom-Integration provides sensors for vertical and horizontal blinds base
 
 This integration builds upon the template sensor from this forum post [Automatic Blinds](https://community.home-assistant.io/t/automatic-blinds-sunscreen-control-based-on-sun-platform/)
 
+## Credits
+
+**Adaptive Cover Pro** is a fork of the original [Adaptive Cover](https://github.com/basbruss/adaptive-cover) integration created by **[Bas Brussee (@basbruss)](https://github.com/basbruss)**.
+
+This fork includes enhancements and modifications, but the core functionality and architecture are based on Bas Brussee's excellent work. Please visit the [original repository](https://github.com/basbruss/adaptive-cover) to see the upstream project and consider supporting the original author.
+
+## Table of Contents
+
 - [Adaptive Cover Pro](#adaptive-cover-pro)
+  - [Credits](#credits)
+  - [Table of Contents](#table-of-contents)
   - [Features](#features)
   - [Installation](#installation)
     - [HACS (Recommended)](#hacs-recommended)
