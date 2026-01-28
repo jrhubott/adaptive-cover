@@ -1,0 +1,54 @@
+name: "Publish Release on Tag"
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    name: "Publish Release"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Checkout the repository"
+        uses: "actions/checkout@v4.2.1"
+
+      - name: "Get tag name"
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: "Find or create release"
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+
+          # Check if release exists (draft or published)
+          RELEASE_ID=$(gh release view "$TAG" --json id -q .id 2>/dev/null || echo "")
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "No release found for $TAG, creating new release"
+            gh release create "$TAG" \
+              --title "Adaptive Cover Pro ⛅ $TAG" \
+              --notes "Release $TAG" \
+              --draft=false
+          else
+            echo "Found existing release for $TAG, publishing it"
+            gh release edit "$TAG" --draft=false
+          fi
+
+      - name: "ZIP the integration directory"
+        shell: "bash"
+        run: |
+          cd "${{ github.workspace }}/custom_components/adaptive_cover_pro"
+          zip adaptive_cover_pro.zip -r ./
+
+      - name: "Upload the ZIP file to the release"
+        uses: softprops/action-gh-release@v2.2.1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          files: ${{ github.workspace }}/custom_components/adaptive_cover_pro/adaptive_cover_pro.zip
