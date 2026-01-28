@@ -182,6 +182,12 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 
 ## Variables
 
+**Note on Units:** All dimension and temperature units automatically adapt to your Home Assistant unit system configuration:
+- **Metric System:** Distances in meters (m) and centimeters (cm), temperatures in Celsius (°C)
+- **US Customary System:** Distances in feet (ft) and inches (in), temperatures in Fahrenheit (°F)
+
+Values are stored internally in metric but displayed and configured using your system's preferred units.
+
 ### Common
 
 | Variables                     | Default | Range | Description                                                                                              |
@@ -202,26 +208,26 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 
 ### Vertical
 
-| Variables         | Default | Range | Description                                                                                 |
-| ----------------- | ------- | ----- | ------------------------------------------------------------------------------------------- |
-| Window Height     | 2.1     | 0.1-6 | Length of fully extended cover/window                                                       |
-| Glare Zone        | 0.5     | 0.1-5 | Objects within this distance of the cover recieve direct sunlight. Measured horizontally from the bottom of the cover when fully extended |
+| Variables         | Default | Range (Metric / Imperial) | Description                                                                                 |
+| ----------------- | ------- | ------------------------- | ------------------------------------------------------------------------------------------- |
+| Window Height     | 2.1 m (7 ft) | 0.1-6 m (0.3-20 ft) | Length of fully extended cover/window                                                       |
+| Glare Zone        | 0.5 m (1.6 ft) | 0.1-5 m (0.3-16 ft) | Objects within this distance of the cover recieve direct sunlight. Measured horizontally from the bottom of the cover when fully extended |
 
 ### Horizontal
 
-| Variables                  | Default | Range | Description                                    |
-| -------------------------- | ------- | ----- | ---------------------------------------------- |
-| Awning Height              | 2       | 0.1-6 | Height from work area to awning mounting point |
-| Awning Length (horizontal) | 2.1     | 0.3-6 | Length of the awning when fully extended       |
-| Awning Angle               | 0       | 0-45  | Angle of the awning from the wall              |
-| Glare Zone                 | 0.5     | 0.1-5 | Objects within this distance of the cover recieve direct sunlight |
+| Variables                  | Default | Range (Metric / Imperial) | Description                                    |
+| -------------------------- | ------- | ------------------------- | ---------------------------------------------- |
+| Awning Height              | 2 m (6.6 ft) | 0.1-6 m (0.3-20 ft) | Height from work area to awning mounting point |
+| Awning Length (horizontal) | 2.1 m (7 ft) | 0.3-6 m (1-20 ft) | Length of the awning when fully extended       |
+| Awning Angle               | 0° | 0-45° | Angle of the awning from the wall              |
+| Glare Zone                 | 0.5 m (1.6 ft) | 0.1-5 m (0.3-16 ft) | Objects within this distance of the cover recieve direct sunlight |
 
 ### Tilt
 
-| Variables     | Default        | Range  | Description                                                |
-| ------------- | -------------- | ------ | ---------------------------------------------------------- |
-| Slat Depth    | 3              | 0.1-15 | Width of each slat                                         |
-| Slat Distance | 2              | 0.1-15 | Vertical distance between two slats in horizontal position |
+| Variables     | Default        | Range (Metric / Imperial)  | Description                                                |
+| ------------- | -------------- | -------------------------- | ---------------------------------------------------------- |
+| Slat Depth    | 3 cm (1.2 in) | 0.1-15 cm (0.04-6 in) | Width of each slat                                         |
+| Slat Distance | 2 cm (0.8 in) | 0.1-15 cm (0.04-6 in) | Vertical distance between two slats in horizontal position |
 | Tilt Mode     | Bi-directional |        |                                                            |
 
 ### Automation
@@ -242,11 +248,11 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 
 ### Climate
 
-| Variables                     | Default | Range | Example                                       | Description                                                                                                                                          |
-| ----------------------------- | ------- | ----- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Variables                     | Default | Range (Metric / Imperial) | Example                                       | Description                                                                                                                                          |
+| ----------------------------- | ------- | ------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Indoor Temperature Entity     | `None`  |       | `climate.living_room` \| `sensor.indoor_temp` |                                                                                                                                                      |
-| Minimum Comfort Temperature   | 21      | 0-86  |                                               |                                                                                                                                                      |
-| Maximum Comfort Temperature   | 25      | 0-86  |                                               |                                                                                                                                                      |
+| Minimum Comfort Temperature   | 21°C (70°F) | 0-86°C (32-187°F)  |                                               |                                                                                                                                                      |
+| Maximum Comfort Temperature   | 25°C (77°F) | 0-90°C (32-194°F)  |                                               |                                                                                                                                                      |
 | Outdoor Temperature Entity    | `None`  |       | `sensor.outdoor_temp`                         |                                                                                                                                                      |
 | Outdoor Temperature Threshold | `None`  |       |                                               | If the minimum outside temperature for summer mode is set and the outside temperature falls below this threshold, summer mode will not be activated. |
 | Presence Entity               | `None`  |       |                                               |                                                                                                                                                      |

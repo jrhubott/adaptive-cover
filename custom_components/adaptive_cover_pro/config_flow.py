@@ -76,6 +76,18 @@ from .const import (
     CONF_ENABLE_MAX_POSITION,
     CONF_ENABLE_MIN_POSITION,
 )
+from .unit_helpers import (
+    celsius_to_display,
+    cm_to_display,
+    display_to_celsius,
+    display_to_cm,
+    display_to_meters,
+    get_config_for_field,
+    get_distance_unit,
+    get_small_distance_unit,
+    get_temperature_unit,
+    meters_to_display,
+)
 
 # DEFAULT_NAME = "Adaptive Cover"
 
@@ -369,6 +381,217 @@ def _get_azimuth_edges(data) -> tuple[int, int]:
     return data[CONF_FOV_LEFT] + data[CONF_FOV_RIGHT]
 
 
+# Dynamic schema builder functions that adapt to unit system
+def build_vertical_options_schema(hass, existing_config=None):
+    """Build vertical blind options schema with appropriate units."""
+    height_cfg = get_config_for_field(hass, "height")
+    distance_cfg = get_config_for_field(hass, "distance")
+    dist_unit = get_distance_unit(hass)
+
+    default_height = height_cfg["default"]
+    default_distance = distance_cfg["default"]
+    if existing_config:
+        if CONF_HEIGHT_WIN in existing_config:
+            default_height = meters_to_display(hass, existing_config[CONF_HEIGHT_WIN])
+        if CONF_DISTANCE in existing_config:
+            default_distance = meters_to_display(hass, existing_config[CONF_DISTANCE])
+
+    return vol.Schema(
+        {
+            vol.Optional(CONF_ENTITIES, default=[]): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    multiple=True,
+                    filter=selector.EntityFilterSelectorConfig(
+                        domain="cover",
+                        supported_features=["cover.CoverEntityFeature.SET_POSITION"],
+                    ),
+                )
+            ),
+            vol.Required(CONF_HEIGHT_WIN, default=default_height): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=height_cfg["min"],
+                    max=height_cfg["max"],
+                    step=height_cfg["step"],
+                    mode="slider",
+                    unit_of_measurement=dist_unit,
+                )
+            ),
+            vol.Required(CONF_DISTANCE, default=default_distance): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=distance_cfg["min"],
+                    max=distance_cfg["max"],
+                    step=distance_cfg["step"],
+                    mode="slider",
+                    unit_of_measurement=dist_unit,
+                )
+            ),
+        }
+    ).extend(OPTIONS.schema)
+
+
+def build_horizontal_options_schema(hass, existing_config=None):
+    """Build horizontal awning options schema with appropriate units."""
+    length_cfg = get_config_for_field(hass, "length")
+    dist_unit = get_distance_unit(hass)
+
+    default_length = length_cfg["default"]
+    if existing_config and CONF_LENGTH_AWNING in existing_config:
+        default_length = meters_to_display(hass, existing_config[CONF_LENGTH_AWNING])
+
+    vertical_schema = build_vertical_options_schema(hass, existing_config)
+
+    return vol.Schema(
+        {
+            vol.Required(CONF_LENGTH_AWNING, default=default_length): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=length_cfg["min"],
+                    max=length_cfg["max"],
+                    step=length_cfg["step"],
+                    mode="slider",
+                    unit_of_measurement=dist_unit,
+                )
+            ),
+            vol.Required(CONF_AWNING_ANGLE, default=0): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0, max=45, mode="slider", unit_of_measurement="°"
+                )
+            ),
+        }
+    ).extend(vertical_schema.schema)
+
+
+def build_tilt_options_schema(hass, existing_config=None):
+    """Build tilt blind options schema with appropriate units."""
+    slat_depth_cfg = get_config_for_field(hass, "slat_depth")
+    slat_distance_cfg = get_config_for_field(hass, "slat_distance")
+    small_dist_unit = get_small_distance_unit(hass)
+
+    default_depth = slat_depth_cfg["default"]
+    default_distance = slat_distance_cfg["default"]
+    if existing_config:
+        if CONF_TILT_DEPTH in existing_config:
+            default_depth = cm_to_display(hass, existing_config[CONF_TILT_DEPTH])
+        if CONF_TILT_DISTANCE in existing_config:
+            default_distance = cm_to_display(hass, existing_config[CONF_TILT_DISTANCE])
+
+    return vol.Schema(
+        {
+            vol.Optional(CONF_ENTITIES, default=[]): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    multiple=True,
+                    filter=selector.EntityFilterSelectorConfig(
+                        domain="cover",
+                        supported_features=["cover.CoverEntityFeature.SET_TILT_POSITION"],
+                    ),
+                )
+            ),
+            vol.Required(CONF_TILT_DEPTH, default=default_depth): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=slat_depth_cfg["min"],
+                    max=slat_depth_cfg["max"],
+                    step=slat_depth_cfg["step"],
+                    mode="slider",
+                    unit_of_measurement=small_dist_unit,
+                )
+            ),
+            vol.Required(CONF_TILT_DISTANCE, default=default_distance): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=slat_distance_cfg["min"],
+                    max=slat_distance_cfg["max"],
+                    step=slat_distance_cfg["step"],
+                    mode="slider",
+                    unit_of_measurement=small_dist_unit,
+                )
+            ),
+            vol.Required(CONF_TILT_MODE, default="mode2"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=["mode1", "mode2"], translation_key="tilt_mode"
+                )
+            ),
+        }
+    ).extend(OPTIONS.schema)
+
+
+def build_climate_options_schema(hass, existing_config=None):
+    """Build climate options schema with appropriate units."""
+    temp_low_cfg = get_config_for_field(hass, "temp_low")
+    temp_high_cfg = get_config_for_field(hass, "temp_high")
+    temp_unit = get_temperature_unit(hass)
+
+    default_temp_low = temp_low_cfg["default"]
+    default_temp_high = temp_high_cfg["default"]
+    if existing_config:
+        if CONF_TEMP_LOW in existing_config:
+            default_temp_low = celsius_to_display(hass, existing_config[CONF_TEMP_LOW])
+        if CONF_TEMP_HIGH in existing_config:
+            default_temp_high = celsius_to_display(hass, existing_config[CONF_TEMP_HIGH])
+
+    return vol.Schema(
+        {
+            vol.Required(CONF_TEMP_ENTITY): selector.EntitySelector(
+                selector.EntityFilterSelectorConfig(domain=["climate", "sensor"])
+            ),
+            vol.Required(CONF_TEMP_LOW, default=default_temp_low): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=temp_low_cfg["min"],
+                    max=temp_low_cfg["max"],
+                    step=temp_low_cfg["step"],
+                    mode="slider",
+                    unit_of_measurement=temp_unit,
+                )
+            ),
+            vol.Required(CONF_TEMP_HIGH, default=default_temp_high): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=temp_high_cfg["min"],
+                    max=temp_high_cfg["max"],
+                    step=temp_high_cfg["step"],
+                    mode="slider",
+                    unit_of_measurement=temp_unit,
+                )
+            ),
+            vol.Optional(
+                CONF_OUTSIDETEMP_ENTITY, default=vol.UNDEFINED
+            ): selector.EntitySelector(
+                selector.EntityFilterSelectorConfig(domain=["sensor"])
+            ),
+            vol.Optional(CONF_OUTSIDE_THRESHOLD, default=0): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=100)
+            ),
+            vol.Optional(
+                CONF_PRESENCE_ENTITY, default=vol.UNDEFINED
+            ): selector.EntitySelector(
+                selector.EntityFilterSelectorConfig(
+                    domain=["device_tracker", "zone", "binary_sensor", "input_boolean"]
+                )
+            ),
+            vol.Optional(CONF_LUX_ENTITY, default=vol.UNDEFINED): selector.EntitySelector(
+                selector.EntityFilterSelectorConfig(
+                    domain=["sensor"], device_class="illuminance"
+                )
+            ),
+            vol.Optional(CONF_LUX_THRESHOLD, default=1000): selector.NumberSelector(
+                selector.NumberSelectorConfig(mode="box", unit_of_measurement="lux")
+            ),
+            vol.Optional(
+                CONF_IRRADIANCE_ENTITY, default=vol.UNDEFINED
+            ): selector.EntitySelector(
+                selector.EntityFilterSelectorConfig(
+                    domain=["sensor"], device_class="irradiance"
+                )
+            ),
+            vol.Optional(CONF_IRRADIANCE_THRESHOLD, default=300): selector.NumberSelector(
+                selector.NumberSelectorConfig(mode="box", unit_of_measurement="W/m²")
+            ),
+            vol.Optional(CONF_TRANSPARENT_BLIND, default=False): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_WEATHER_ENTITY, default=vol.UNDEFINED
+            ): selector.EntitySelector(
+                selector.EntityFilterSelectorConfig(domain="weather")
+            ),
+        }
+    )
+
+
 class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     """Handle ConfigFlow."""
 
@@ -408,11 +631,18 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 if user_input[CONF_MAX_ELEVATION] <= user_input[CONF_MIN_ELEVATION]:
                     return self.async_show_form(
                         step_id="vertical",
-                        data_schema=CLIMATE_MODE.extend(VERTICAL_OPTIONS.schema),
+                        data_schema=CLIMATE_MODE.extend(build_vertical_options_schema(self.hass, self.config).schema),
                         errors={
                             CONF_MAX_ELEVATION: "Must be greater than 'Minimal Elevation'"
                         },
                     )
+
+            # Convert display units to metric before storing
+            if CONF_HEIGHT_WIN in user_input:
+                user_input[CONF_HEIGHT_WIN] = display_to_meters(self.hass, user_input[CONF_HEIGHT_WIN])
+            if CONF_DISTANCE in user_input:
+                user_input[CONF_DISTANCE] = display_to_meters(self.hass, user_input[CONF_DISTANCE])
+
             self.config.update(user_input)
 
             # Extract first cover entity's name to auto-populate device name
@@ -442,7 +672,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             return await self.async_step_automation()
         return self.async_show_form(
             step_id="vertical",
-            data_schema=CLIMATE_MODE.extend(VERTICAL_OPTIONS.schema),
+            data_schema=CLIMATE_MODE.extend(build_vertical_options_schema(self.hass, self.config).schema),
         )
 
     async def async_step_horizontal(self, user_input: dict[str, Any] | None = None):
@@ -456,11 +686,20 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 if user_input[CONF_MAX_ELEVATION] <= user_input[CONF_MIN_ELEVATION]:
                     return self.async_show_form(
                         step_id="horizontal",
-                        data_schema=CLIMATE_MODE.extend(HORIZONTAL_OPTIONS.schema),
+                        data_schema=CLIMATE_MODE.extend(build_horizontal_options_schema(self.hass, self.config).schema),
                         errors={
                             CONF_MAX_ELEVATION: "Must be greater than 'Minimal Elevation'"
                         },
                     )
+
+            # Convert display units to metric before storing
+            if CONF_LENGTH_AWNING in user_input:
+                user_input[CONF_LENGTH_AWNING] = display_to_meters(self.hass, user_input[CONF_LENGTH_AWNING])
+            if CONF_HEIGHT_WIN in user_input:
+                user_input[CONF_HEIGHT_WIN] = display_to_meters(self.hass, user_input[CONF_HEIGHT_WIN])
+            if CONF_DISTANCE in user_input:
+                user_input[CONF_DISTANCE] = display_to_meters(self.hass, user_input[CONF_DISTANCE])
+
             self.config.update(user_input)
 
             # Extract first cover entity's name to auto-populate device name
@@ -490,7 +729,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             return await self.async_step_automation()
         return self.async_show_form(
             step_id="horizontal",
-            data_schema=CLIMATE_MODE.extend(HORIZONTAL_OPTIONS.schema),
+            data_schema=CLIMATE_MODE.extend(build_horizontal_options_schema(self.hass, self.config).schema),
         )
 
     async def async_step_tilt(self, user_input: dict[str, Any] | None = None):
@@ -504,11 +743,18 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 if user_input[CONF_MAX_ELEVATION] <= user_input[CONF_MIN_ELEVATION]:
                     return self.async_show_form(
                         step_id="tilt",
-                        data_schema=CLIMATE_MODE.extend(TILT_OPTIONS.schema),
+                        data_schema=CLIMATE_MODE.extend(build_tilt_options_schema(self.hass, self.config).schema),
                         errors={
                             CONF_MAX_ELEVATION: "Must be greater than 'Minimal Elevation'"
                         },
                     )
+
+            # Convert display units to metric before storing
+            if CONF_TILT_DEPTH in user_input:
+                user_input[CONF_TILT_DEPTH] = display_to_cm(self.hass, user_input[CONF_TILT_DEPTH])
+            if CONF_TILT_DISTANCE in user_input:
+                user_input[CONF_TILT_DISTANCE] = display_to_cm(self.hass, user_input[CONF_TILT_DISTANCE])
+
             self.config.update(user_input)
 
             # Extract first cover entity's name to auto-populate device name
@@ -537,7 +783,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_blind_spot()
             return await self.async_step_automation()
         return self.async_show_form(
-            step_id="tilt", data_schema=CLIMATE_MODE.extend(TILT_OPTIONS.schema)
+            step_id="tilt", data_schema=CLIMATE_MODE.extend(build_tilt_options_schema(self.hass, self.config).schema)
         )
 
     async def async_step_interp(self, user_input: dict[str, Any] | None = None):
@@ -605,11 +851,17 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_climate(self, user_input: dict[str, Any] | None = None):
         """Manage climate options."""
         if user_input is not None:
+            # Convert display units to metric before storing
+            if CONF_TEMP_LOW in user_input:
+                user_input[CONF_TEMP_LOW] = display_to_celsius(self.hass, user_input[CONF_TEMP_LOW])
+            if CONF_TEMP_HIGH in user_input:
+                user_input[CONF_TEMP_HIGH] = display_to_celsius(self.hass, user_input[CONF_TEMP_HIGH])
+
             self.config.update(user_input)
             if self.config.get(CONF_WEATHER_ENTITY):
                 return await self.async_step_weather()
             return await self.async_step_update()
-        return self.async_show_form(step_id="climate", data_schema=CLIMATE_OPTIONS)
+        return self.async_show_form(step_id="climate", data_schema=build_climate_options_schema(self.hass, self.config))
 
     async def async_step_weather(self, user_input: dict[str, Any] | None = None):
         """Manage weather conditions."""
@@ -748,9 +1000,10 @@ class OptionsFlowHandler(OptionsFlow):
     async def async_step_vertical(self, user_input: dict[str, Any] | None = None):
         """Show basic config for vertical blinds."""
         self.type_blind = SensorType.BLIND
-        schema = CLIMATE_MODE.extend(VERTICAL_OPTIONS.schema)
+        vertical_schema = build_vertical_options_schema(self.hass, self.options)
+        schema = CLIMATE_MODE.extend(vertical_schema.schema)
         if self.options[CONF_CLIMATE_MODE]:
-            schema = VERTICAL_OPTIONS
+            schema = vertical_schema
         if user_input is not None:
             keys = [
                 CONF_MIN_ELEVATION,
@@ -764,11 +1017,18 @@ class OptionsFlowHandler(OptionsFlow):
                 if user_input[CONF_MAX_ELEVATION] <= user_input[CONF_MIN_ELEVATION]:
                     return self.async_show_form(
                         step_id="vertical",
-                        data_schema=CLIMATE_MODE.extend(VERTICAL_OPTIONS.schema),
+                        data_schema=CLIMATE_MODE.extend(build_vertical_options_schema(self.hass, self.options).schema),
                         errors={
                             CONF_MAX_ELEVATION: "Must be greater than 'Minimal Elevation'"
                         },
                     )
+
+            # Convert display units to metric before storing
+            if CONF_HEIGHT_WIN in user_input:
+                user_input[CONF_HEIGHT_WIN] = display_to_meters(self.hass, user_input[CONF_HEIGHT_WIN])
+            if CONF_DISTANCE in user_input:
+                user_input[CONF_DISTANCE] = display_to_meters(self.hass, user_input[CONF_DISTANCE])
+
             self.options.update(user_input)
             if self.options.get(CONF_INTERP, False):
                 return await self.async_step_interp()
@@ -787,9 +1047,10 @@ class OptionsFlowHandler(OptionsFlow):
     async def async_step_horizontal(self, user_input: dict[str, Any] | None = None):
         """Show basic config for horizontal blinds."""
         self.type_blind = SensorType.AWNING
-        schema = CLIMATE_MODE.extend(HORIZONTAL_OPTIONS.schema)
+        horizontal_schema = build_horizontal_options_schema(self.hass, self.options)
+        schema = CLIMATE_MODE.extend(horizontal_schema.schema)
         if self.options[CONF_CLIMATE_MODE]:
-            schema = HORIZONTAL_OPTIONS
+            schema = horizontal_schema
         if user_input is not None:
             keys = [
                 CONF_MIN_ELEVATION,
@@ -803,11 +1064,20 @@ class OptionsFlowHandler(OptionsFlow):
                 if user_input[CONF_MAX_ELEVATION] <= user_input[CONF_MIN_ELEVATION]:
                     return self.async_show_form(
                         step_id="horizontal",
-                        data_schema=CLIMATE_MODE.extend(HORIZONTAL_OPTIONS.schema),
+                        data_schema=CLIMATE_MODE.extend(build_horizontal_options_schema(self.hass, self.options).schema),
                         errors={
                             CONF_MAX_ELEVATION: "Must be greater than 'Minimal Elevation'"
                         },
                     )
+
+            # Convert display units to metric before storing
+            if CONF_LENGTH_AWNING in user_input:
+                user_input[CONF_LENGTH_AWNING] = display_to_meters(self.hass, user_input[CONF_LENGTH_AWNING])
+            if CONF_HEIGHT_WIN in user_input:
+                user_input[CONF_HEIGHT_WIN] = display_to_meters(self.hass, user_input[CONF_HEIGHT_WIN])
+            if CONF_DISTANCE in user_input:
+                user_input[CONF_DISTANCE] = display_to_meters(self.hass, user_input[CONF_DISTANCE])
+
             self.options.update(user_input)
             if self.options[CONF_CLIMATE_MODE]:
                 return await self.async_step_climate()
@@ -822,9 +1092,10 @@ class OptionsFlowHandler(OptionsFlow):
     async def async_step_tilt(self, user_input: dict[str, Any] | None = None):
         """Show basic config for tilted blinds."""
         self.type_blind = SensorType.TILT
-        schema = CLIMATE_MODE.extend(TILT_OPTIONS.schema)
+        tilt_schema = build_tilt_options_schema(self.hass, self.options)
+        schema = CLIMATE_MODE.extend(tilt_schema.schema)
         if self.options[CONF_CLIMATE_MODE]:
-            schema = TILT_OPTIONS
+            schema = tilt_schema
         if user_input is not None:
             keys = [
                 CONF_MIN_ELEVATION,
@@ -838,11 +1109,18 @@ class OptionsFlowHandler(OptionsFlow):
                 if user_input[CONF_MAX_ELEVATION] <= user_input[CONF_MIN_ELEVATION]:
                     return self.async_show_form(
                         step_id="tilt",
-                        data_schema=CLIMATE_MODE.extend(TILT_OPTIONS.schema),
+                        data_schema=CLIMATE_MODE.extend(build_tilt_options_schema(self.hass, self.options).schema),
                         errors={
                             CONF_MAX_ELEVATION: "Must be greater than 'Minimal Elevation'"
                         },
                     )
+
+            # Convert display units to metric before storing
+            if CONF_TILT_DEPTH in user_input:
+                user_input[CONF_TILT_DEPTH] = display_to_cm(self.hass, user_input[CONF_TILT_DEPTH])
+            if CONF_TILT_DISTANCE in user_input:
+                user_input[CONF_TILT_DISTANCE] = display_to_cm(self.hass, user_input[CONF_TILT_DISTANCE])
+
             self.options.update(user_input)
             if self.options[CONF_CLIMATE_MODE]:
                 return await self.async_step_climate()
@@ -925,6 +1203,13 @@ class OptionsFlowHandler(OptionsFlow):
                 CONF_IRRADIANCE_ENTITY,
             ]
             self.optional_entities(entities, user_input)
+
+            # Convert display units to metric before storing
+            if CONF_TEMP_LOW in user_input:
+                user_input[CONF_TEMP_LOW] = display_to_celsius(self.hass, user_input[CONF_TEMP_LOW])
+            if CONF_TEMP_HIGH in user_input:
+                user_input[CONF_TEMP_HIGH] = display_to_celsius(self.hass, user_input[CONF_TEMP_HIGH])
+
             self.options.update(user_input)
             if self.options.get(CONF_WEATHER_ENTITY):
                 return await self.async_step_weather()
@@ -932,7 +1217,7 @@ class OptionsFlowHandler(OptionsFlow):
         return self.async_show_form(
             step_id="climate",
             data_schema=self.add_suggested_values_to_schema(
-                CLIMATE_OPTIONS, user_input or self.options
+                build_climate_options_schema(self.hass, self.options), user_input or self.options
             ),
         )
 
