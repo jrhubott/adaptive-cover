@@ -1,7 +1,7 @@
-![Version](https://img.shields.io/github/v/release/basbruss/adaptive-cover?style=for-the-badge)
+![Version](https://img.shields.io/github/v/release/jrhubott/adaptive-cover?style=for-the-badge)
 
-![logo](https://github.com/basbruss/adaptive-cover/blob/main/images/logo.png#gh-light-mode-only)
-![logo](https://github.com/basbruss/adaptive-cover/blob/main/images/dark_logo.png#gh-dark-mode-only)
+![logo](https://github.com/jrhubott/adaptive-cover/blob/main/images/logo.png#gh-light-mode-only)
+![logo](https://github.com/jrhubott/adaptive-cover/blob/main/images/dark_logo.png#gh-dark-mode-only)
 
 # Adaptive Cover Pro
 
@@ -36,7 +36,7 @@ This integration builds upon the template sensor from this forum post [Automatic
 ## Features
 
 - Individual service devices for `vertical`, `horizontal` and `tilted` covers
-- Two mode approach with multiple strategies [Modes(`basic`,`climate`)](https://github.com/basbruss/adaptive-cover?tab=readme-ov-file#modes)
+- Two mode approach with multiple strategies [Modes(`basic`,`climate`)](https://github.com/jrhubott/adaptive-cover?tab=readme-ov-file#modes)
 - Binary Sensor to track when the sun is in front of the window
 - Sensors for `start` and `end` time
 - Auto manual override detection
@@ -60,7 +60,7 @@ This integration builds upon the template sensor from this forum post [Automatic
 
 ### HACS (Recommended)
 
-Add <https://github.com/basbruss/adaptive-cover> as custom repository to HACS.
+Add <https://github.com/jrhubott/adaptive-cover> as custom repository to HACS.
 Search and download Adaptive Cover Pro within HACS.
 
 Restart Home-Assistant and add the integration.
@@ -147,7 +147,7 @@ This mode uses the calculated position when the sun is within the specified azim
 ### Climate mode
 
 This mode calculates the position based on extra parameters for presence, indoor temperature, minimal comfort temperature, maximum comfort temperature and weather (optional).
-This mode is split up in two types of strategies; [Presence](https://github.com/basbruss/adaptive-cover?tab=readme-ov-file#presence) and [No Presence](https://github.com/basbruss/adaptive-cover?tab=readme-ov-file#no-presence).
+This mode is split up in two types of strategies; [Presence](https://github.com/jrhubott/adaptive-cover?tab=readme-ov-file#presence) and [No Presence](https://github.com/jrhubott/adaptive-cover?tab=readme-ov-file#no-presence).
 
 #### Climate strategies
 
@@ -274,7 +274,7 @@ When climate mode is setup you will also get these entities:
 | `switch.{type}_climate_mode_{name}`        | `on`    | Enables climate mode strategy; otherwise, defaults to the standard strategy.                                |
 | `switch.{type}_outside_temperature_{name}` | `on`    | Switches between inside and outside temperatures as the basis for determining the climate control strategy. |
 
-![entities](https://github.com/basbruss/adaptive-cover/blob/main/images/entities.png)
+![entities](https://github.com/jrhubott/adaptive-cover/blob/main/images/entities.png)
 
 ## Features Planned
 
