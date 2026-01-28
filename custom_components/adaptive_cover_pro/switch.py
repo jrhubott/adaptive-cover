@@ -15,7 +15,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_CLIMATE_MODE,
-    CONF_ENTITIES,
     CONF_IRRADIANCE_ENTITY,
     CONF_LUX_ENTITY,
     CONF_OUTSIDETEMP_ENTITY,
@@ -90,10 +89,9 @@ async def async_setup_entry(
     sensor_entity = config_entry.options.get(CONF_OUTSIDETEMP_ENTITY)
     lux_entity = config_entry.options.get(CONF_LUX_ENTITY)
     irradiance_entity = config_entry.options.get(CONF_IRRADIANCE_ENTITY)
-    switches = []
 
-    if len(config_entry.options.get(CONF_ENTITIES)) >= 1:
-        switches = [control_switch, manual_switch]
+    # Always add control and manual switches for all cover types
+    switches = [control_switch, manual_switch]
 
     if climate_mode:
         switches.append(climate_switch)
