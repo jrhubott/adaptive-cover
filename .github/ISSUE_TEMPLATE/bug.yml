@@ -11,7 +11,7 @@ body:
     validations:
       required: true
     attributes:
-      label: What version of Adaptive Cover are you using?
+      label: What version of Adaptive Cover Pro are you using?
 
   - type: input
     id: homeassistant

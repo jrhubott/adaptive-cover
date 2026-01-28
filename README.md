@@ -3,13 +3,13 @@
 ![logo](https://github.com/basbruss/adaptive-cover/blob/main/images/logo.png#gh-light-mode-only)
 ![logo](https://github.com/basbruss/adaptive-cover/blob/main/images/dark_logo.png#gh-dark-mode-only)
 
-# Adaptive Cover
+# Adaptive Cover Pro
 
 This Custom-Integration provides sensors for vertical and horizontal blinds based on the sun's position by calculating the position to filter out direct sunlight.
 
 This integration builds upon the template sensor from this forum post [Automatic Blinds](https://community.home-assistant.io/t/automatic-blinds-sunscreen-control-based-on-sun-platform/)
 
-- [Adaptive Cover](#adaptive-cover)
+- [Adaptive Cover Pro](#adaptive-cover-pro)
   - [Features](#features)
   - [Installation](#installation)
     - [HACS (Recommended)](#hacs-recommended)
@@ -61,7 +61,7 @@ This integration builds upon the template sensor from this forum post [Automatic
 ### HACS (Recommended)
 
 Add <https://github.com/basbruss/adaptive-cover> as custom repository to HACS.
-Search and download Adaptive Cover within HACS.
+Search and download Adaptive Cover Pro within HACS.
 
 Restart Home-Assistant and add the integration.
 
@@ -74,7 +74,7 @@ Restart Home-Assistant and add the integration.
 
 ## Setup
 
-Adaptive Cover supports (for now) three types of covers/blinds; `Vertical` and `Horizontal` and `Venetian (Tilted)` blinds.
+Adaptive Cover Pro supports (for now) three types of covers/blinds; `Vertical` and `Horizontal` and `Venetian (Tilted)` blinds.
 Each type has its own specific parameters to setup a sensor. To setup the sensor you first need to find out the azimuth of the window(s). This can be done by finding your location on [Open Street Map Compass](https://osmcompass.com/).
 
 ## Cover Types

@@ -1,4 +1,4 @@
-"""The Coordinator for Adaptive Cover."""
+"""The Coordinator for Adaptive Cover Pro."""
 
 from __future__ import annotations
 

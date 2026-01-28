@@ -1,4 +1,4 @@
-"""Binary Sensor platform for the Adaptive Cover integration."""
+"""Binary Sensor platform for the Adaptive Cover Pro integration."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the Adaptive Cover binary sensor platform."""
+    """Set up the Adaptive Cover Pro binary sensor platform."""
     coordinator: AdaptiveDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]
@@ -53,7 +53,7 @@ async def async_setup_entry(
 class AdaptiveCoverBinarySensor(
     CoordinatorEntity[AdaptiveDataUpdateCoordinator], BinarySensorEntity
 ):
-    """representation of a Adaptive Cover binary sensor."""
+    """representation of a Adaptive Cover Pro binary sensor."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False

@@ -1,5 +1,5 @@
 blueprint:
-  name: Adaptive Cover
+  name: Adaptive Cover Pro
   description: "`version 0.0.2` \n
     Set cover position based on direct sunlight exposed to window \n\n
     Calculations are done internally in the blueprint removing the need to use a sensor to input a value
@@ -11,15 +11,15 @@ blueprint:
   domain: automation
   input:
     adaptive_cover_entity:
-      name: Adaptive Cover sensor
+      name: Adaptive Cover Pro sensor
       description: "Sensor for corresponding the azimuth"
       selector:
         entity:
           filter:
-            integration: adaptive_cover
+            integration: adaptive_cover_pro
     cover_entity:
       name: Cover
-      description: "Additional cover(s) not yet configured from the Adaptive Cover integration"
+      description: "Additional cover(s) not yet configured from the Adaptive Cover Pro integration"
       default: []
       selector:
         entity:

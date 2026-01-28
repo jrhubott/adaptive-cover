@@ -1,4 +1,4 @@
-"""Button platform for the Adaptive Cover integration."""
+"""Button platform for the Adaptive Cover Pro integration."""
 
 from __future__ import annotations
 

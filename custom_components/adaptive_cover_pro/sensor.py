@@ -1,4 +1,4 @@
-"""Sensor platform for Adaptive Cover integration."""
+"""Sensor platform for Adaptive Cover Pro integration."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Initialize Adaptive Cover config entry."""
+    """Initialize Adaptive Cover Pro config entry."""
 
     name = config_entry.data["name"]
     coordinator: AdaptiveDataUpdateCoordinator = hass.data[DOMAIN][
@@ -69,7 +69,7 @@ async def async_setup_entry(
 class AdaptiveCoverSensorEntity(
     CoordinatorEntity[AdaptiveDataUpdateCoordinator], SensorEntity
 ):
-    """Adaptive Cover Sensor."""
+    """Adaptive Cover Pro Sensor."""
 
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = PERCENTAGE
@@ -135,7 +135,7 @@ class AdaptiveCoverSensorEntity(
 class AdaptiveCoverTimeSensorEntity(
     CoordinatorEntity[AdaptiveDataUpdateCoordinator], SensorEntity
 ):
-    """Adaptive Cover Time Sensor."""
+    """Adaptive Cover Pro Time Sensor."""
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_has_entity_name = True
@@ -201,7 +201,7 @@ class AdaptiveCoverTimeSensorEntity(
 class AdaptiveCoverControlSensorEntity(
     CoordinatorEntity[AdaptiveDataUpdateCoordinator], SensorEntity
 ):
-    """Adaptive Cover Control method Sensor."""
+    """Adaptive Cover Pro Control method Sensor."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
