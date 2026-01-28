@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_CLIMATE_MODE,
+    CONF_DEFAULT_HEIGHT,
     CONF_IRRADIANCE_ENTITY,
     CONF_LUX_ENTITY,
     CONF_OUTSIDETEMP_ENTITY,
@@ -83,15 +84,28 @@ async def async_setup_entry(
         "irradiance_toggle",
         coordinator,
     )
+    return_default_switch = AdaptiveCoverSwitch(
+        config_entry,
+        config_entry.entry_id,
+        "Return to Default",
+        False,
+        "return_to_default_toggle",
+        coordinator,
+    )
 
     climate_mode = config_entry.options.get(CONF_CLIMATE_MODE)
     weather_entity = config_entry.options.get(CONF_WEATHER_ENTITY)
     sensor_entity = config_entry.options.get(CONF_OUTSIDETEMP_ENTITY)
     lux_entity = config_entry.options.get(CONF_LUX_ENTITY)
     irradiance_entity = config_entry.options.get(CONF_IRRADIANCE_ENTITY)
+    sensor_type = config_entry.data.get(CONF_SENSOR_TYPE)
 
     # Always add control and manual switches for all cover types
     switches = [control_switch, manual_switch]
+
+    # Add return to default switch only for horizontal covers
+    if sensor_type == "cover_awning":
+        switches.append(return_default_switch)
 
     if climate_mode:
         switches.append(climate_switch)
@@ -177,6 +191,21 @@ class AdaptiveCoverSwitch(
         if self._key == "automatic_control" and kwargs.get("added") is not True:
             for entity in self.coordinator.manager.manual_controlled:
                 self.coordinator.manager.reset(entity)
+
+            # Return to default position if enabled (horizontal covers only)
+            if (
+                hasattr(self.coordinator, "return_to_default_toggle")
+                and self.coordinator.return_to_default_toggle
+            ):
+                default_position = self.coordinator.config_entry.options.get(
+                    CONF_DEFAULT_HEIGHT, 60
+                )
+                self.coordinator.logger.debug(
+                    "Returning covers to default position: %s", default_position
+                )
+                for entity in self.coordinator.entities:
+                    await self.coordinator.async_set_position(entity, default_position)
+
         await self.coordinator.async_refresh()
         self.schedule_update_ha_state()
 

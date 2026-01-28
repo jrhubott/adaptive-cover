@@ -141,6 +141,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._manual_toggle = None
         self._lux_toggle = None
         self._irradiance_toggle = None
+        self._return_to_default_toggle = None
         self._start_time = None
         self._sun_end_time = None
         self._sun_start_time = None
@@ -809,6 +810,15 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     @irradiance_toggle.setter
     def irradiance_toggle(self, value):
         self._irradiance_toggle = value
+
+    @property
+    def return_to_default_toggle(self):
+        """Toggle return to default position on auto control off."""
+        return self._return_to_default_toggle
+
+    @return_to_default_toggle.setter
+    def return_to_default_toggle(self, value):
+        self._return_to_default_toggle = value
 
 
 class AdaptiveCoverManager:
