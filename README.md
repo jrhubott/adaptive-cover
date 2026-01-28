@@ -50,6 +50,7 @@ This fork includes enhancements and modifications, but the core functionality an
 - Binary Sensor to track when the sun is in front of the window
 - Sensors for `start` and `end` time
 - Auto manual override detection
+- Smart device naming - automatically suggests device names based on your cover entities
 
 - **Climate Mode**
 
@@ -62,6 +63,7 @@ This fork includes enhancements and modifications, but the core functionality an
 
   - Turn control on/off
   - Control multiple covers
+  - Optional return to default position when automatic control is disabled
   - Set start time to prevent opening blinds while you are asleep
   - Set minimum interval time between position changes
   - set minimum percentage change
@@ -86,6 +88,8 @@ Restart Home-Assistant and add the integration.
 
 Adaptive Cover Pro supports (for now) three types of covers/blinds; `Vertical` and `Horizontal` and `Venetian (Tilted)` blinds.
 Each type has its own specific parameters to setup a sensor. To setup the sensor you first need to find out the azimuth of the window(s). This can be done by finding your location on [Open Street Map Compass](https://osmcompass.com/).
+
+During setup, the integration will automatically suggest a device name based on the first cover entity you select, prefixed with "Adaptive" (e.g., "Living Room Blind" becomes "Adaptive Living Room Blind"). You can modify this suggested name if desired.
 
 ## Cover Types
 
@@ -275,6 +279,7 @@ These entities are always available:
 | `binary_sensor.{type}_sun_infront_{name}` | `off` | Indicates whether the sun is in front of the window within the designated field of view. |
 | `switch.{type}_automatic_control_{name}` | `on` | Activates the adaptive control feature. When enabled, blinds adjust based on calculated position, unless manually overridden. |
 | `switch.{type}_manual_override_{name}` | `on` | Enables detection of manual overrides. A cover is marked if its position differs from the calculated one, resetting to adaptive control after a set duration. |
+| `switch.{type}_return_to_default_when_disabled_{name}` (vertical & horizontal only) | `off` | When enabled, covers automatically return to their default position when automatic control is turned off. Useful for retracting awnings or setting blinds to a safe position. |
 | `button.{type}_reset_manual_override_{name}` | `on` | Resets manual override tags for all covers; if `switch.{type}_automatic_control_{name}` is on, it also restores blinds to their correct positions. |
 
 When climate mode is setup you will also get these entities:
