@@ -86,13 +86,13 @@ class AdaptiveCoverBinarySensor(
         self._attr_device_class = device_class
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
-            name=self._device_name,
+            name=self._name,
         )
 
     @property
     def name(self):
         """Name of the entity."""
-        return f"{self._binary_name} {self._name}"
+        return self._binary_name
 
     @property
     def is_on(self) -> bool:

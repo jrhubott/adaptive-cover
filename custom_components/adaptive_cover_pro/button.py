@@ -69,13 +69,13 @@ class AdaptiveCoverButton(
         self._entities = config_entry.options.get(CONF_ENTITIES, [])
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
-            name=self._device_name,
+            name=self._name,
         )
 
     @property
     def name(self):
         """Name of the entity."""
-        return f"{self._button_name} {self._name}"
+        return self._button_name
 
     async def async_press(self) -> None:
         """Handle the button press."""
