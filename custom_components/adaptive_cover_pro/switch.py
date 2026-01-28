@@ -87,7 +87,7 @@ async def async_setup_entry(
     return_default_switch = AdaptiveCoverSwitch(
         config_entry,
         config_entry.entry_id,
-        "Return to Default",
+        "Return to default when disabled",
         False,
         "return_to_default_toggle",
         coordinator,
@@ -103,8 +103,8 @@ async def async_setup_entry(
     # Always add control and manual switches for all cover types
     switches = [control_switch, manual_switch]
 
-    # Add return to default switch only for horizontal covers
-    if sensor_type == "cover_awning":
+    # Add return to default switch for vertical and horizontal covers
+    if sensor_type in ["cover_awning", "cover_blind"]:
         switches.append(return_default_switch)
 
     if climate_mode:
@@ -192,7 +192,7 @@ class AdaptiveCoverSwitch(
             for entity in self.coordinator.manager.manual_controlled:
                 self.coordinator.manager.reset(entity)
 
-            # Return to default position if enabled (horizontal covers only)
+            # Return to default position if enabled
             if (
                 hasattr(self.coordinator, "return_to_default_toggle")
                 and self.coordinator.return_to_default_toggle
