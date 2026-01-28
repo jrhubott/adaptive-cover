@@ -9,14 +9,14 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 description = "Adaptive Cover Pro"
-documentation = "https://github.com/basbruss/adaptive-cover"
-homepage = "https://github.com/basbruss/adaptive-cover"
+documentation = "https://github.com/jrhubott/adaptive-cover"
+homepage = "https://github.com/jrhubott/adaptive-cover"
 license = "Passive Aggressive License"
 maintainers = ["Bas Brussee"]
 name = "adaptive_cover_pro"
 packages = []
 readme = "README.md"
-repository = "https://github.com/basbruss/adaptive-cover"
+repository = "https://github.com/jrhubott/adaptive-cover"
 version = "2.0.0"
 
 [tool.poetry.dependencies]
@@ -31,8 +31,8 @@ pylint = "3.3.1"
 ruff = "0.9.1"
 
 [tool.poetry.urls]
-"Bug Tracker" = "https://github.com/basbruss/adaptive-cover/issues"
-Changelog = "https://github.com/basbruss/adaptive-cover/releases"
+"Bug Tracker" = "https://github.com/jrhubott/adaptive-cover/issues"
+Changelog = "https://github.com/jrhubott/adaptive-cover/releases"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
