@@ -8,12 +8,12 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3",
 ]
-description = "Adaptive Cover"
+description = "Adaptive Cover Pro"
 documentation = "https://github.com/basbruss/adaptive-cover"
 homepage = "https://github.com/basbruss/adaptive-cover"
 license = "Passive Aggressive License"
 maintainers = ["Bas Brussee"]
-name = "adaptive_cover"
+name = "adaptive_cover_pro"
 packages = []
 readme = "README.md"
 repository = "https://github.com/basbruss/adaptive-cover"
@@ -60,7 +60,7 @@ ignore = [
   "W191",
 ]
 select = ["ALL"]
-src = ["custom_components/adaptive_cover"]
+src = ["custom_components/adaptive_cover_pro"]
 
 [tool.ruff.flake8-import-conventions.extend-aliases]
 "homeassistant.helpers.area_registry" = "ar"

@@ -1,6 +1,6 @@
 {
-  "domain": "adaptive_cover",
-  "name": "Adaptive Cover",
+  "domain": "adaptive_cover_pro",
+  "name": "Adaptive Cover Pro",
   "codeowners": ["@basbruss"],
   "config_flow": true,
   "dependencies": [

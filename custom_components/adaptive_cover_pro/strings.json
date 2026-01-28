@@ -1,5 +1,5 @@
 {
-  "title": "Adaptive Cover",
+  "title": "Adaptive Cover Pro",
   "config": {
     "step": {
       "user": {
@@ -38,12 +38,9 @@
         "data": {
           "set_azimuth": "Window Azimuth",
           "window_height": "Window Height",
-          "distance_shaded_area": "Glare Zone",
+          "distance_shaded_area": "Shaded area",
           "default_percentage": "Default Position",
-          "min_position": "Minimum Position",
           "max_position": "Maximum Position",
-          "enable_min_position": "Only force the minimum position when the sun is in front of the window",
-          "enable_max_position": "Only force the maximum position when the sun is in front of the window",
           "fov_left": "Field of view left",
           "fov_right": "Field of view right",
           "group": "Cover Entities",
@@ -60,9 +57,8 @@
         "data_description": {
           "set_azimuth": "Adjust Azimuth",
           "window_height": "Specify window height in meters",
-          "distance_shaded_area": "Objects within this distance from the cover recieve direct sunlight. Distance measured horizontally from the bottom of the cover when the cover is fully extended.",
+          "distance_shaded_area": "Distance from cover to shaded area in meters",
           "default_percentage": "Default cover position as a percentage",
-          "min_position": "Minimum adjustable cover position as a percentage",
           "max_position": "Maximum adjustable cover position as a percentage",
           "fov_left": "Field of view angle to the left of the window center",
           "fov_right": "Field of view angle to the right of the window center",
@@ -87,8 +83,7 @@
           "lux_entity": "Lux sensor (optional)",
           "lux_threshold": "Lux threshold",
           "irradiance_entity": "Irradiance sensor (optional)",
-          "irradiance_threshold": "Irradiance threshold",
-          "outside_threshold": "Minimum outside temperature for summer mode"
+          "irradiance_threshold": "Irradiance threshold"
         },
         "data_description": {
           "presence_entity": "Entity representing room or home presence status",
@@ -108,7 +103,7 @@
       "weather": {
         "data": { "weather_state": "Weather Conditions" },
         "data_description": {
-          "weather_state": "Choose weather conditions that indicate the possibility of direct sunlight."
+          "weather_state": "Choose the weather conditions that enable automatic window control."
         },
         "title": "Weather Conditions"
       },
@@ -118,12 +113,9 @@
           "length_awning": "Awning Span Length",
           "window_height": "Awning Height",
           "angle": "Awning Angle",
-          "distance_shaded_area": "Glare Zone",
+          "distance_shaded_area": "Shaded area",
           "default_percentage": "Default Position",
-          "min_position": "Minimum Position",
           "max_position": "Maximum Position",
-          "enable_min_position": "Only force the minimum position when the sun is in front of the window",
-          "enable_max_position": "Only force the maximum position when the sun is in front of the window",
           "fov_left": "Field of view left",
           "fov_right": "Field of view right",
           "group": "Cover Entities",
@@ -142,9 +134,8 @@
           "window_height": "Adjust the height of the awning from the level of the workarea",
           "length_awning": "Total span length in meters",
           "angle": "Angle of the attached awning measured perpendicular from the wall to the ground",
-          "distance_shaded_area": "Objects within this distance from the cover recieve direct sunlight",
+          "distance_shaded_area": "Distance from cover to shaded area in meters",
           "default_percentage": "Default cover position as a percentage",
-          "min_position": "Minimum adjustable cover position as a percentage",
           "max_position": "Maximum adjustable cover position as a percentage",
           "fov_left": "Field of view degrees to the left of the window center",
           "fov_right": "Field of view degrees to the right of the window center",
@@ -163,10 +154,7 @@
           "slat_depth": "Slat Depth",
           "slat_distance": "Slat Spacing",
           "default_percentage": "Default Position",
-          "min_position": "Minimum Position",
           "max_position": "Maximum Position",
-          "enable_min_position": "Only force the minimum position when the sun is in front of the window",
-          "enable_max_position": "Only force the maximum position when the sun is in front of the window",
           "fov_left": "Field of view left",
           "fov_right": "Field of view right",
           "group": "Cover Entities",
@@ -186,7 +174,6 @@
           "slat_depth": "Depth of each individual slat in centimeters",
           "slat_distance": "Vertical distance between two slats in centimeters",
           "default_percentage": "Default cover position as a percentage",
-          "min_position": "Minimum adjustable cover position as a percentage",
           "max_position": "Maximum adjustable cover position as a percentage",
           "fov_left": "Degrees to consider from the left side of the window center",
           "fov_right": "Degrees to consider from the right side of the window center",
@@ -271,12 +258,9 @@
         "data": {
           "set_azimuth": "Window Azimuth",
           "window_height": "Window Height",
-          "distance_shaded_area": "Glare Zone",
+          "distance_shaded_area": "Shaded area",
           "default_percentage": "Default Position",
-          "min_position": "Minimum Position",
           "max_position": "Maximum Position",
-          "enable_min_position": "Only force the minimum position when the sun is in front of the window",
-          "enable_max_position": "Only force the maximum position when the sun is in front of the window",
           "fov_left": "Field of view left",
           "fov_right": "Field of view right",
           "group": "Cover Entities",
@@ -293,9 +277,8 @@
         "data_description": {
           "set_azimuth": "Adjust Azimuth",
           "window_height": "Specify window height in meters",
-          "distance_shaded_area": "Objects within this distance from the cover recieve direct sunlight. Distance measured horizontally from the bottom of the cover when the cover is fully extended.",
+          "distance_shaded_area": "Distance from cover to shaded area in meters",
           "default_percentage": "Default cover position as a percentage",
-          "min_position": "Minimum adjustable cover position as a percentage",
           "max_position": "Maximum adjustable cover position as a percentage",
           "fov_left": "Field of view angle to the left of the window center",
           "fov_right": "Field of view angle to the right of the window center",
@@ -320,8 +303,7 @@
           "lux_entity": "Lux sensor (optional)",
           "lux_threshold": "Lux threshold",
           "irradiance_entity": "Irradiance sensor (optional)",
-          "irradiance_threshold": "Irradiance threshold",
-          "outside_threshold": "Minimum outside temperature for summer mode"
+          "irradiance_threshold": "Irradiance threshold"
         },
         "data_description": {
           "presence_entity": "Entity representing room or home presence status",
@@ -341,7 +323,7 @@
       "weather": {
         "data": { "weather_state": "Weather Conditions" },
         "data_description": {
-          "weather_state": "Choose weather conditions that indicate the possibility of direct sunlight."
+          "weather_state": "Choose the weather conditions that enable automatic window control."
         },
         "title": "Weather Conditions"
       },
@@ -351,12 +333,9 @@
           "length_awning": "Awning Span Length",
           "window_height": "Awning Height",
           "angle": "Awning Angle",
-          "distance_shaded_area": "Glare Zone",
+          "distance_shaded_area": "Shaded area",
           "default_percentage": "Default Position",
-          "min_position": "Minimum Position",
           "max_position": "Maximum Position",
-          "enable_min_position": "Only force the minimum position when the sun is in front of the window",
-          "enable_max_position": "Only force the maximum position when the sun is in front of the window",
           "fov_left": "Field of view left",
           "fov_right": "Field of view right",
           "group": "Cover Entities",
@@ -375,9 +354,8 @@
           "window_height": "Adjust the height of the awning from the level of the workarea",
           "length_awning": "Total span length in meters",
           "angle": "Angle of the attached awning measured perpendicular from the wall to the ground",
-          "distance_shaded_area": "Objects within this distance from the cover recieve direct sunlight",
+          "distance_shaded_area": "Distance from cover to shaded area in meters",
           "default_percentage": "Default cover position as a percentage",
-          "min_position": "Minimum adjustable cover position as a percentage",
           "max_position": "Maximum adjustable cover position as a percentage",
           "fov_left": "Field of view degrees to the left of the window center",
           "fov_right": "Field of view degrees to the right of the window center",
@@ -396,10 +374,7 @@
           "slat_depth": "Slat Depth",
           "slat_distance": "Slat Spacing",
           "default_percentage": "Default Position",
-          "min_position": "Minimum Position",
           "max_position": "Maximum Position",
-          "enable_min_position": "Only force the minimum position when the sun is in front of the window",
-          "enable_max_position": "Only force the maximum position when the sun is in front of the window",
           "fov_left": "Field of view left",
           "fov_right": "Field of view right",
           "group": "Cover Entities",
@@ -419,7 +394,6 @@
           "slat_depth": "Depth of each individual slat in centimeters",
           "slat_distance": "Vertical distance between two slats in centimeters",
           "default_percentage": "Default cover position as a percentage",
-          "min_position": "Minimum Position",
           "max_position": "Maximum adjustable cover position as a percentage",
           "fov_left": "Degrees to consider from the left side of the window center",
           "fov_right": "Degrees to consider from the right side of the window center",

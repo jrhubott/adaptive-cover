@@ -1,4 +1,4 @@
-"""Switch platform for the Adaptive Cover integration."""
+"""Switch platform for the Adaptive Cover Pro integration."""
 
 from __future__ import annotations
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Adaptive Cover** is a Home Assistant custom integration that automatically controls vertical blinds, horizontal awnings, and tilted/venetian blinds based on the sun's position. It calculates optimal positions to filter direct sunlight while maximizing natural light and supporting climate-aware operation.
+**Adaptive Cover Pro** is a Home Assistant custom integration that automatically controls vertical blinds, horizontal awnings, and tilted/venetian blinds based on the sun's position. It calculates optimal positions to filter direct sunlight while maximizing natural light and supporting climate-aware operation.
 
 **Language:** Python 3.11+
 **Framework:** Home Assistant Core (async architecture)
@@ -140,13 +140,13 @@ Config is stored in two layers:
 - Requires matplotlib and pvlib for simulation plots
 
 ### Simulation
-- `custom_components/adaptive_cover/simulation/` contains simulation tools
+- `custom_components/adaptive_cover_pro/simulation/` contains simulation tools
 - Generate position plots over time for different configurations
 
 ## File Organization
 
 ```
-custom_components/adaptive_cover/
+custom_components/adaptive_cover_pro/
 ├── __init__.py              # Integration entry point
 ├── coordinator.py           # Data coordinator (primary hub)
 ├── calculation.py           # Position calculation engine

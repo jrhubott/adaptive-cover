@@ -1,4 +1,4 @@
-"""Config flow for Adaptive Cover integration."""
+"""Config flow for Adaptive Cover Pro integration."""
 
 from __future__ import annotations
 

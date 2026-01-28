@@ -2,7 +2,7 @@
 
 import logging
 
-DOMAIN = "adaptive_cover"
+DOMAIN = "adaptive_cover_pro"
 LOGGER = logging.getLogger(__package__)
 _LOGGER = logging.getLogger(__name__)
 
