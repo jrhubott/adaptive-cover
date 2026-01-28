@@ -205,7 +205,7 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 | Variables         | Default | Range | Description                                                                                 |
 | ----------------- | ------- | ----- | ------------------------------------------------------------------------------------------- |
 | Window Height     | 2.1     | 0.1-6 | Length of fully extended cover/window                                                       |
-| Glare Zone        | 0.5     | 0.1-2 | Objects within this distance of the cover recieve direct sunlight. Measured horizontally from the bottom of the cover when fully extended |
+| Glare Zone        | 0.5     | 0.1-5 | Objects within this distance of the cover recieve direct sunlight. Measured horizontally from the bottom of the cover when fully extended |
 
 ### Horizontal
 
@@ -214,7 +214,7 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 | Awning Height              | 2       | 0.1-6 | Height from work area to awning mounting point |
 | Awning Length (horizontal) | 2.1     | 0.3-6 | Length of the awning when fully extended       |
 | Awning Angle               | 0       | 0-45  | Angle of the awning from the wall              |
-| Glare Zone                 | 0.5     | 0.1-2 | Objects within this distance of the cover recieve direct sunlight |
+| Glare Zone                 | 0.5     | 0.1-5 | Objects within this distance of the cover recieve direct sunlight |
 
 ### Tilt
 
