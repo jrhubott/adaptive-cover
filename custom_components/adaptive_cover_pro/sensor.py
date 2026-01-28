@@ -111,7 +111,7 @@ class AdaptiveCoverSensorEntity(
     @property
     def name(self):
         """Name of the entity."""
-        return f"{self._sensor_name} {self._name}"
+        return self._sensor_name
 
     @property
     def native_value(self) -> str | None:
@@ -124,7 +124,7 @@ class AdaptiveCoverSensorEntity(
         return DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, self._device_id)},
-            name=self._device_name,
+            name=self._name,
         )
 
     @property
@@ -181,7 +181,7 @@ class AdaptiveCoverTimeSensorEntity(
     @property
     def name(self):
         """Name of the entity."""
-        return f"{self._sensor_name} {self._name}"
+        return self._sensor_name
 
     @property
     def native_value(self) -> str | None:
@@ -194,7 +194,7 @@ class AdaptiveCoverTimeSensorEntity(
         return DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, self._device_id)},
-            name=self._device_name,
+            name=self._name,
         )
 
 
@@ -243,7 +243,7 @@ class AdaptiveCoverControlSensorEntity(
     @property
     def name(self):
         """Name of the entity."""
-        return f"{self._sensor_name} {self._name}"
+        return self._sensor_name
 
     @property
     def native_value(self) -> str | None:
@@ -256,5 +256,5 @@ class AdaptiveCoverControlSensorEntity(
         return DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, self._device_id)},
-            name=self._device_name,
+            name=self._name,
         )
