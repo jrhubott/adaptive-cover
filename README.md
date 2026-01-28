@@ -268,26 +268,37 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 
 The integration dynamically adds multiple entities based on the used features.
 
+**Note on Entity Naming:**
+
+Entity IDs follow the pattern: `{domain}.{device_name}_{entity_name}`
+
+Where `{device_name}` is the slugified version of the device name you configured during setup.
+
+**Example:** For a device named "Adaptive Living Room Blind":
+- `sensor.adaptive_living_room_blind_cover_position`
+- `switch.adaptive_living_room_blind_automatic_control`
+- `binary_sensor.adaptive_living_room_blind_sun_infront`
+
 These entities are always available:
 | Entities | Default | Description |
 | --------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `sensor.{type}_cover_position_{name}` | | Reflects the current state determined by predefined settings and factors such as sun position, weather, and temperature |
-| `sensor.{type}_control_method_{name}` | `intermediate` | Indicates the active control strategy based on weather conditions. Options include `winter`, `summer`, and `intermediate` |
-| `sensor.{type}_start_sun_{name}` | | Shows the starting time when the sun enters the window's view, with an interval of every 5 minutes. |
-| `sensor.{type}_end_sun_{name}` | | Indicates the ending time when the sun exits the window's view, with an interval of every 5 minutes. |
-| `binary_sensor.{type}_manual_override_{name}` | `off` | Indicates if manual override is engaged for any blinds. |
-| `binary_sensor.{type}_sun_infront_{name}` | `off` | Indicates whether the sun is in front of the window within the designated field of view. |
-| `switch.{type}_automatic_control_{name}` | `on` | Activates the adaptive control feature. When enabled, blinds adjust based on calculated position, unless manually overridden. |
-| `switch.{type}_manual_override_{name}` | `on` | Enables detection of manual overrides. A cover is marked if its position differs from the calculated one, resetting to adaptive control after a set duration. |
-| `switch.{type}_return_to_default_when_disabled_{name}` (vertical & horizontal only) | `off` | When enabled, covers automatically return to their default position when automatic control is turned off. Useful for retracting awnings or setting blinds to a safe position. |
-| `button.{type}_reset_manual_override_{name}` | `on` | Resets manual override tags for all covers; if `switch.{type}_automatic_control_{name}` is on, it also restores blinds to their correct positions. |
+| `sensor.{device_name}_cover_position` | | Reflects the current state determined by predefined settings and factors such as sun position, weather, and temperature |
+| `sensor.{device_name}_control_method` | `intermediate` | Indicates the active control strategy based on weather conditions. Options include `winter`, `summer`, and `intermediate` |
+| `sensor.{device_name}_start_sun` | | Shows the starting time when the sun enters the window's view, with an interval of every 5 minutes. |
+| `sensor.{device_name}_end_sun` | | Indicates the ending time when the sun exits the window's view, with an interval of every 5 minutes. |
+| `binary_sensor.{device_name}_manual_override` | `off` | Indicates if manual override is engaged for any blinds. |
+| `binary_sensor.{device_name}_sun_infront` | `off` | Indicates whether the sun is in front of the window within the designated field of view. |
+| `switch.{device_name}_automatic_control` | `on` | Activates the adaptive control feature. When enabled, blinds adjust based on calculated position, unless manually overridden. |
+| `switch.{device_name}_manual_override` | `on` | Enables detection of manual overrides. A cover is marked if its position differs from the calculated one, resetting to adaptive control after a set duration. |
+| `switch.{device_name}_return_to_default_when_disabled` (vertical & horizontal only) | `off` | When enabled, covers automatically return to their default position when automatic control is turned off. Useful for retracting awnings or setting blinds to a safe position. |
+| `button.{device_name}_reset_manual_override` | `on` | Resets manual override tags for all covers; if `switch.{device_name}_automatic_control` is on, it also restores blinds to their correct positions. |
 
 When climate mode is setup you will also get these entities:
 
 | Entities                                   | Default | Description                                                                                                 |
 | ------------------------------------------ | ------- | ----------------------------------------------------------------------------------------------------------- |
-| `switch.{type}_climate_mode_{name}`        | `on`    | Enables climate mode strategy; otherwise, defaults to the standard strategy.                                |
-| `switch.{type}_outside_temperature_{name}` | `on`    | Switches between inside and outside temperatures as the basis for determining the climate control strategy. |
+| `switch.{device_name}_climate_mode`        | `on`    | Enables climate mode strategy; otherwise, defaults to the standard strategy.                                |
+| `switch.{device_name}_outside_temperature` | `on`    | Switches between inside and outside temperatures as the basis for determining the climate control strategy. |
 
 ![entities](https://github.com/jrhubott/adaptive-cover/blob/main/images/entities.png)
 
