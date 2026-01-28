@@ -17,7 +17,7 @@ name = "adaptive_cover_pro"
 packages = []
 readme = "README.md"
 repository = "https://github.com/jrhubott/adaptive-cover"
-version = "2.0.0"
+version = "2.0.1"
 
 [tool.poetry.dependencies]
 homeassistant = "2023.11.1"
