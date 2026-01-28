@@ -12,7 +12,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import selector
+from homeassistant.helpers import entity_registry as er, selector
 
 from .const import (
     CONF_AWNING_ANGLE,
@@ -414,6 +414,27 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         },
                     )
             self.config.update(user_input)
+
+            # Extract first cover entity's name to auto-populate device name
+            if CONF_ENTITIES in user_input and user_input[CONF_ENTITIES]:
+                first_entity_id = user_input[CONF_ENTITIES][0]
+                entity_reg = er.async_get(self.hass)
+                entity_entry = entity_reg.async_get(first_entity_id)
+
+                if entity_entry:
+                    # Get entity name (use original_name or name, fallback to ID)
+                    entity_name = (
+                        entity_entry.original_name
+                        or entity_entry.name
+                        or first_entity_id.split(".")[-1].replace("_", " ").title()
+                    )
+
+                    # Create suggested device name with "Adaptive" prefix
+                    suggested_name = f"Adaptive {entity_name}"
+
+                    # Update the config name with suggestion
+                    self.config["name"] = suggested_name
+
             if self.config[CONF_INTERP]:
                 return await self.async_step_interp()
             if self.config[CONF_ENABLE_BLIND_SPOT]:
@@ -441,6 +462,27 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         },
                     )
             self.config.update(user_input)
+
+            # Extract first cover entity's name to auto-populate device name
+            if CONF_ENTITIES in user_input and user_input[CONF_ENTITIES]:
+                first_entity_id = user_input[CONF_ENTITIES][0]
+                entity_reg = er.async_get(self.hass)
+                entity_entry = entity_reg.async_get(first_entity_id)
+
+                if entity_entry:
+                    # Get entity name (use original_name or name, fallback to ID)
+                    entity_name = (
+                        entity_entry.original_name
+                        or entity_entry.name
+                        or first_entity_id.split(".")[-1].replace("_", " ").title()
+                    )
+
+                    # Create suggested device name with "Adaptive" prefix
+                    suggested_name = f"Adaptive {entity_name}"
+
+                    # Update the config name with suggestion
+                    self.config["name"] = suggested_name
+
             if self.config[CONF_INTERP]:
                 return await self.async_step_interp()
             if self.config[CONF_ENABLE_BLIND_SPOT]:
@@ -468,6 +510,27 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         },
                     )
             self.config.update(user_input)
+
+            # Extract first cover entity's name to auto-populate device name
+            if CONF_ENTITIES in user_input and user_input[CONF_ENTITIES]:
+                first_entity_id = user_input[CONF_ENTITIES][0]
+                entity_reg = er.async_get(self.hass)
+                entity_entry = entity_reg.async_get(first_entity_id)
+
+                if entity_entry:
+                    # Get entity name (use original_name or name, fallback to ID)
+                    entity_name = (
+                        entity_entry.original_name
+                        or entity_entry.name
+                        or first_entity_id.split(".")[-1].replace("_", " ").title()
+                    )
+
+                    # Create suggested device name with "Adaptive" prefix
+                    suggested_name = f"Adaptive {entity_name}"
+
+                    # Update the config name with suggestion
+                    self.config["name"] = suggested_name
+
             if self.config[CONF_INTERP]:
                 return await self.async_step_interp()
             if self.config[CONF_ENABLE_BLIND_SPOT]:
