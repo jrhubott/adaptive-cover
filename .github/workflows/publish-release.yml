@@ -1,4 +1,4 @@
-name: "Publish Release on Tag"
+name: "Create Draft Release on Tag"
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   publish-release:
-    name: "Publish Release"
+    name: "Create Draft Release"
     runs-on: "ubuntu-latest"
     steps:
       - name: "Checkout the repository"
@@ -31,14 +31,14 @@ jobs:
           RELEASE_ID=$(gh release view "$TAG" --json id -q .id 2>/dev/null || echo "")
 
           if [ -z "$RELEASE_ID" ]; then
-            echo "No release found for $TAG, creating new release"
+            echo "No release found for $TAG, creating new draft release"
             gh release create "$TAG" \
               --title "Adaptive Cover Pro ⛅ $TAG" \
               --notes "Release $TAG" \
-              --draft=false
+              --draft=true
           else
-            echo "Found existing release for $TAG, publishing it"
-            gh release edit "$TAG" --draft=false
+            echo "Found existing release for $TAG, keeping it as draft"
+            # Don't auto-publish, keep as draft for manual review
           fi
 
       - name: "ZIP the integration directory"
