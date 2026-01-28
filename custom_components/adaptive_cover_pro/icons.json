@@ -24,7 +24,7 @@
       }
     },
     "switch": {
-      "control_toggle": {
+      "automatic_control": {
         "default": "mdi:toggle-switch-outline",
         "state": {
           "off": "mdi:toggle-switch-off-outline"

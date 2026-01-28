@@ -47,9 +47,9 @@ async def async_setup_entry(
     control_switch = AdaptiveCoverSwitch(
         config_entry,
         config_entry.entry_id,
-        "Toggle Control",
+        "Automatic Control",
         True,
-        "control_toggle",
+        "automatic_control",
         coordinator,
     )
     climate_switch = AdaptiveCoverSwitch(
@@ -159,7 +159,7 @@ class AdaptiveCoverSwitch(
         self.coordinator.logger.debug("Turning on")
         self._attr_is_on = True
         setattr(self.coordinator, self._key, True)
-        if self._key == "control_toggle" and kwargs.get("added") is not True:
+        if self._key == "automatic_control" and kwargs.get("added") is not True:
             for entity in self.coordinator.entities:
                 if (
                     not self.coordinator.manager.is_cover_manual(entity)
@@ -176,7 +176,7 @@ class AdaptiveCoverSwitch(
         self.coordinator.logger.debug("Turning off")
         self._attr_is_on = False
         setattr(self.coordinator, self._key, False)
-        if self._key == "control_toggle" and kwargs.get("added") is not True:
+        if self._key == "automatic_control" and kwargs.get("added") is not True:
             for entity in self.coordinator.manager.manual_controlled:
                 self.coordinator.manager.reset(entity)
         await self.coordinator.async_refresh()

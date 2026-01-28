@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Language:** Python 3.11+
 **Framework:** Home Assistant Core (async architecture)
-**Version:** 0.3.0b0 (requires Home Assistant 2024.5.0+)
+**Version:** 2.0.0 (requires Home Assistant 2024.5.0+)
 
 ## Development Commands
 
@@ -69,7 +69,7 @@ This integration follows Home Assistant's **Data Coordinator Pattern**:
 
 Each platform file registers entities with Home Assistant:
 - `sensor.py` - Position, control method, start/end sun times
-- `switch.py` - Control toggle, climate mode, manual override detection
+- `switch.py` - Automatic control, climate mode, manual override detection
 - `binary_sensor.py` - Sun visibility, manual override status
 - `button.py` - Manual override reset
 

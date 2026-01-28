@@ -137,7 +137,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._use_interpolation = self.config_entry.options.get(CONF_INTERP, False)
         self._track_end_time = self.config_entry.options.get(CONF_RETURN_SUNSET)
         self._temp_toggle = None
-        self._control_toggle = None
+        self._automatic_control = None
         self._manual_toggle = None
         self._lux_toggle = None
         self._irradiance_toggle = None
@@ -358,7 +358,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
     async def async_handle_state_change(self, state: int, options):
         """Handle state change from tracked entities."""
-        if self.control_toggle:
+        if self.automatic_control:
             for cover in self.entities:
                 await self.async_handle_call_service(cover, state, options)
         else:
@@ -368,7 +368,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
     async def async_handle_cover_state_change(self, state: int):
         """Handle state change from assigned covers."""
-        if self.manual_toggle and self.control_toggle:
+        if self.manual_toggle and self.automatic_control:
             self.manager.handle_state_change(
                 self.state_change_data,
                 state,
@@ -382,7 +382,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
     async def async_handle_first_refresh(self, state: int, options):
         """Handle first refresh."""
-        if self.control_toggle:
+        if self.automatic_control:
             for cover in self.entities:
                 if (
                     self.check_adaptive_time
@@ -401,7 +401,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             "This is a timed refresh, using sunset position: %s",
             options.get(CONF_SUNSET_POS),
         )
-        if self.control_toggle:
+        if self.automatic_control:
             for cover in self.entities:
                 await self.async_set_manual_position(
                     cover,
@@ -775,13 +775,13 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._temp_toggle = value
 
     @property
-    def control_toggle(self):
+    def automatic_control(self):
         """Toggle automation."""
-        return self._control_toggle
+        return self._automatic_control
 
-    @control_toggle.setter
-    def control_toggle(self, value):
-        self._control_toggle = value
+    @automatic_control.setter
+    def automatic_control(self, value):
+        self._automatic_control = value
 
     @property
     def manual_toggle(self):
