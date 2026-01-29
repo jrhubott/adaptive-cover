@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Language:** Python 3.11+
 **Framework:** Home Assistant Core (async architecture)
-**Version:** 2.4.0 (requires Home Assistant 2024.5.0+)
+**Version:** 2.5.0-beta.1 (requires Home Assistant 2024.5.0+)
 
 ## Development Commands
 
