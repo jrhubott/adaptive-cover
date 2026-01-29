@@ -1,4 +1,4 @@
-name: "Create Draft Release on Tag"
+name: "Create Release on Tag"
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   publish-release:
-    name: "Create Draft Release"
+    name: "Create and Publish Release"
     runs-on: "ubuntu-latest"
     steps:
       - name: "Checkout the repository"
@@ -20,25 +20,24 @@ jobs:
         id: tag
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: "Find or create release"
+      - name: "Create published release"
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
 
-          # Check if release exists (draft or published)
+          # Check if release already exists
           RELEASE_ID=$(gh release view "$TAG" --json id -q .id 2>/dev/null || echo "")
 
           if [ -z "$RELEASE_ID" ]; then
-            echo "No release found for $TAG, creating new draft release"
+            echo "Creating new published release for $TAG"
             gh release create "$TAG" \
               --title "Adaptive Cover Pro ⛅ $TAG" \
-              --notes "Release $TAG" \
-              --draft=true
+              --notes "Release $TAG - See full changelog below" \
+              --generate-notes
           else
-            echo "Found existing release for $TAG, keeping it as draft"
-            # Don't auto-publish, keep as draft for manual review
+            echo "Release already exists for $TAG"
           fi
 
       - name: "ZIP the integration directory"
