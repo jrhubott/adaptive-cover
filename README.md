@@ -326,8 +326,8 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 | Default Position              | 60      | 0-100 | Initial position of the cover in the absence of sunlight glare detection                                 |
 | Minimal Position              | 100     | 0-99  | Minimal opening position for the cover, suitable for partially closing certain cover types               |
 | Maximum Position              | 100     | 1-100 | Maximum opening position for the cover, suitable for partially opening certain cover types               |
-| Field of view Left            | 90      | 1-90  | Unobstructed viewing angle from window center to the left, in degrees                                    |
-| Field of view Right           | 90      | 1-90  | Unobstructed viewing angle from window center to the right, in degrees                                   |
+| Field of view Left            | 90      | 0-180 | Unobstructed viewing angle from window center to the left, in degrees                                    |
+| Field of view Right           | 90      | 0-180 | Unobstructed viewing angle from window center to the right, in degrees                                   |
 | Minimal Elevation             | None    | 0-90  | Minimal elevation degree of the sun to be considered                                                     |
 | Maximum Elevation             | None    | 1-90  | Maximum elevation degree of the sun to be considered                                                     |
 | Default position after Sunset | 0       | 0-100 | Cover's default position from sunset to sunrise                                                          |

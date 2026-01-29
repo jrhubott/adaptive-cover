@@ -129,9 +129,9 @@ class AdaptiveGeneralCover(ABC):
     @property
     def valid(self) -> bool:
         """Determine if sun is in front of window."""
-        # clip azi_min and azi_max to 90
-        azi_min = min(self.fov_left, 90)
-        azi_max = min(self.fov_right, 90)
+        # Use configured FOV values directly without clipping
+        azi_min = self.fov_left
+        azi_max = self.fov_right
 
         # valid sun positions are those within the blind's azimuth range and above the horizon (FOV)
         valid = (
