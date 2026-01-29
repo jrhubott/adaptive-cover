@@ -3,10 +3,15 @@
   "config": {
     "step": {
       "user": {
+        "description": "Found {legacy_count} Adaptive Cover configuration(s) that can be imported",
         "data": {
           "name": "Name",
           "blueprint": "Add blueprint to HomeAssistant",
           "mode": "Type of blind"
+        },
+        "menu_options": {
+          "create_new": "Create new configuration",
+          "import_legacy": "Import from Adaptive Cover ({legacy_count} found)"
         }
       },
       "automation": {
@@ -214,7 +219,29 @@
         },
         "title": "Range Adjustment",
         "description": "Adjust the values at which your Cover effectively opens or closes. Ideal for Covers that don't fully open at 0% or close at 100%. \n The first two sliders are for a 2 point adjustment, the list options are for a multiple point adjustment"
+      },
+      "import_select": {
+        "title": "Select Configurations to Import",
+        "description": "Choose which Adaptive Cover configurations to import to Adaptive Cover Pro. All settings will be preserved.",
+        "data": {
+          "selected_entries": "Configurations to import"
+        }
+      },
+      "import_review": {
+        "title": "Review Import",
+        "description": "Ready to import the following configurations:\n\n{entries_summary}\n\nNote: Your original Adaptive Cover entries will remain unchanged.",
+        "data": {
+          "confirm": "Confirm import"
+        }
       }
+    },
+    "abort": {
+      "no_legacy_entries": "No Adaptive Cover configurations found to import",
+      "user_cancelled": "Import cancelled by user",
+      "validation_failed": "Import validation failed. Please fix these issues:\n\n{errors}\n\nYou can try importing again after fixing missing entities.",
+      "no_entries_selected": "No entries were selected for import",
+      "import_successful": "Import completed successfully",
+      "import_failed": "Import failed - no valid entries to import"
     }
   },
   "options": {

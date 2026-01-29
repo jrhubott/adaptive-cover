@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -10,7 +11,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     OptionsFlow,
 )
-from homeassistant.core import callback
+from homeassistant.core import callback, HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import entity_registry as er, selector
 
@@ -75,7 +76,11 @@ from .const import (
     CONF_MIN_POSITION,
     CONF_ENABLE_MAX_POSITION,
     CONF_ENABLE_MIN_POSITION,
+    DIRECT_MAPPING_FIELDS,
+    LEGACY_DOMAIN,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 # DEFAULT_NAME = "Adaptive Cover"
 
@@ -385,8 +390,24 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         return OptionsFlowHandler(config_entry)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
-        """Handle the initial step."""
+        """Handle the initial step with import detection."""
         # errors = {}
+
+        # Detect legacy entries on first load
+        if not user_input and not hasattr(self, "_legacy_detected"):
+            self._legacy_detected = True
+            legacy_entries = await self._detect_legacy_entries(self.hass)
+
+            if legacy_entries:
+                # Show menu with import option
+                return self.async_show_menu(
+                    step_id="user",
+                    menu_options=["create_new", "import_legacy"],
+                    description_placeholders={
+                        "legacy_count": str(len(legacy_entries))
+                    }
+                )
+
         if user_input:
             self.config = user_input
             if self.config[CONF_MODE] == SensorType.BLIND:
@@ -691,6 +712,289 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 CONF_IRRADIANCE_THRESHOLD: self.config.get(CONF_IRRADIANCE_THRESHOLD),
                 CONF_OUTSIDE_THRESHOLD: self.config.get(CONF_OUTSIDE_THRESHOLD),
             },
+        )
+
+    async def async_step_create_new(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Handle create new configuration flow."""
+        # Redirect to original user flow
+        return await self.async_step_user(user_input)
+
+    async def async_step_import_legacy(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Handle import from legacy Adaptive Cover."""
+        return await self.async_step_import_detect(user_input)
+
+    async def _detect_legacy_entries(self, hass: HomeAssistant) -> list[ConfigEntry]:
+        """Detect existing adaptive_cover config entries."""
+        from homeassistant.config_entries import ConfigEntryState
+
+        legacy_entries = hass.config_entries.async_entries(LEGACY_DOMAIN)
+        return [
+            entry
+            for entry in legacy_entries
+            if entry.state == ConfigEntryState.LOADED
+        ]
+
+    async def _validate_imported_config(
+        self, legacy_entry: ConfigEntry
+    ) -> dict[str, Any]:
+        """Validate that imported configuration entities still exist."""
+        errors = []
+        entity_reg = er.async_get(self.hass)
+
+        # Validate cover entities
+        cover_entities = legacy_entry.options.get(CONF_ENTITIES, [])
+        for entity_id in cover_entities:
+            if not entity_reg.async_get(entity_id):
+                errors.append(f"Cover entity not found: {entity_id}")
+
+        # Validate optional entities
+        optional_entities = [
+            (CONF_TEMP_ENTITY, "Temperature"),
+            (CONF_PRESENCE_ENTITY, "Presence"),
+            (CONF_WEATHER_ENTITY, "Weather"),
+            (CONF_START_ENTITY, "Start time"),
+            (CONF_END_ENTITY, "End time"),
+            (CONF_LUX_ENTITY, "Lux"),
+            (CONF_IRRADIANCE_ENTITY, "Irradiance"),
+            (CONF_OUTSIDETEMP_ENTITY, "Outside temperature"),
+        ]
+
+        for conf_key, label in optional_entities:
+            entity_id = legacy_entry.options.get(conf_key)
+            if entity_id and not entity_reg.async_get(entity_id):
+                errors.append(f"{label} entity not found: {entity_id}")
+
+        return {"valid": len(errors) == 0, "errors": errors}
+
+    async def _ensure_unique_name(self, name: str) -> str:
+        """Ensure imported name doesn't conflict with existing entries."""
+        existing_entries = self.hass.config_entries.async_entries(DOMAIN)
+        existing_names = {e.data.get("name") for e in existing_entries}
+
+        if name not in existing_names:
+            return name
+
+        # Try with " (Imported)" suffix
+        imported_name = f"{name} (Imported)"
+        if imported_name not in existing_names:
+            return imported_name
+
+        # Add number suffix if needed
+        counter = 2
+        while f"{name} (Imported {counter})" in existing_names:
+            counter += 1
+
+        return f"{name} (Imported {counter})"
+
+    async def async_step_import_detect(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Detect and present importable entries."""
+        legacy_entries = await self._detect_legacy_entries(self.hass)
+
+        if not legacy_entries:
+            return self.async_abort(reason="no_legacy_entries")
+
+        # Store entries in flow context
+        self.context["legacy_entries"] = [
+            {
+                "entry_id": e.entry_id,
+                "name": e.data.get("name"),
+                "type": e.data.get(CONF_SENSOR_TYPE),
+            }
+            for e in legacy_entries
+        ]
+
+        return await self.async_step_import_select()
+
+    async def async_step_import_select(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Allow user to select which entries to import."""
+        legacy_entries = self.context.get("legacy_entries", [])
+
+        if user_input is not None:
+            selected_ids = user_input.get("selected_entries", [])
+            self.context["selected_for_import"] = selected_ids
+            return await self.async_step_import_review()
+
+        # Build selection schema with multi-select
+        return self.async_show_form(
+            step_id="import_select",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("selected_entries"): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            multiple=True,
+                            options=[
+                                {
+                                    "value": e["entry_id"],
+                                    "label": f"{e['name']} ({e['type']})",
+                                }
+                                for e in legacy_entries
+                            ],
+                        )
+                    )
+                }
+            ),
+        )
+
+    async def async_step_import_review(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Review configurations before import with validation."""
+        if user_input is not None:
+            if user_input.get("confirm"):
+                return await self.async_step_import_execute()
+            return self.async_abort(reason="user_cancelled")
+
+        # Load legacy entry details and validate
+        selected_ids = self.context.get("selected_for_import", [])
+        legacy_entries = self.hass.config_entries.async_entries(LEGACY_DOMAIN)
+
+        preview_data = []
+        validation_errors = []
+
+        for entry_id in selected_ids:
+            legacy = next((e for e in legacy_entries if e.entry_id == entry_id), None)
+            if not legacy:
+                continue
+
+            # Validate configuration
+            validation_result = await self._validate_imported_config(legacy)
+
+            if not validation_result["valid"]:
+                validation_errors.extend(
+                    [
+                        f"{legacy.data.get('name')}: {error}"
+                        for error in validation_result["errors"]
+                    ]
+                )
+                continue
+
+            # Build preview data
+            cover_entities = legacy.options.get(CONF_ENTITIES, [])
+            climate_enabled = legacy.options.get(CONF_CLIMATE_MODE, False)
+
+            preview_data.append(
+                {
+                    "name": legacy.data.get("name"),
+                    "type": legacy.data.get(CONF_SENSOR_TYPE),
+                    "entities": cover_entities,
+                    "climate_mode": climate_enabled,
+                    "delta_pos": legacy.options.get(CONF_DELTA_POSITION, 1),
+                    "delta_time": legacy.options.get(CONF_DELTA_TIME, 2),
+                }
+            )
+
+        # If validation errors, show error and abort
+        if validation_errors:
+            return self.async_abort(
+                reason="validation_failed",
+                description_placeholders={
+                    "errors": "\n".join([f"• {e}" for e in validation_errors])
+                },
+            )
+
+        # Build summary for display
+        entries_summary = []
+        for p in preview_data:
+            type_label = {
+                SensorType.BLIND: "Vertical",
+                SensorType.AWNING: "Horizontal",
+                SensorType.TILT: "Tilt",
+            }.get(p["type"], p["type"])
+
+            entries_summary.append(
+                f"• {p['name']} ({type_label})\n"
+                f"  - {len(p['entities'])} cover(s): {', '.join(p['entities'])}\n"
+                f"  - Climate mode: {'Enabled' if p['climate_mode'] else 'Disabled'}\n"
+                f"  - Automation: {p['delta_pos']}% threshold, {p['delta_time']} min intervals"
+            )
+
+        return self.async_show_form(
+            step_id="import_review",
+            data_schema=vol.Schema({vol.Required("confirm", default=True): bool}),
+            description_placeholders={"entries_summary": "\n\n".join(entries_summary)},
+        )
+
+    async def async_step_import_execute(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Execute the import operation."""
+        selected_ids = self.context.get("selected_for_import", [])
+        if not selected_ids:
+            return self.async_abort(reason="no_entries_selected")
+
+        # Get the current entry being processed (or start with the first)
+        current_index = self.context.get("import_index", 0)
+
+        if current_index >= len(selected_ids):
+            # All entries processed, show completion
+            imported_count = self.context.get("imported_count", 0)
+            self.hass.components.persistent_notification.async_create(
+                message=(
+                    f"Successfully imported {imported_count} Adaptive Cover "
+                    f"configuration(s) to Adaptive Cover Pro.\n\n"
+                    f"Next steps:\n"
+                    f"1. Verify imported configurations work correctly\n"
+                    f"2. Test cover movements\n"
+                    f"3. Disable old Adaptive Cover entries when ready\n"
+                    f"4. (Optional) Remove old integration from HACS\n\n"
+                    f"Both integrations can run simultaneously during transition."
+                ),
+                title="Adaptive Cover Pro Import Complete",
+                notification_id=f"adaptive_cover_pro_import_{imported_count}",
+            )
+            return self.async_abort(reason="import_successful")
+
+        # Process current entry
+        entry_id = selected_ids[current_index]
+        legacy_entries = self.hass.config_entries.async_entries(LEGACY_DOMAIN)
+        legacy = next((e for e in legacy_entries if e.entry_id == entry_id), None)
+
+        if not legacy:
+            # Skip this entry and move to next
+            self.context["import_index"] = current_index + 1
+            return await self.async_step_import_execute()
+
+        # Map data (immutable setup info)
+        new_data = {
+            "name": legacy.data.get("name"),
+            CONF_SENSOR_TYPE: legacy.data.get(CONF_SENSOR_TYPE),
+        }
+
+        # Map options (all configuration fields)
+        new_options = {}
+        for field in DIRECT_MAPPING_FIELDS:
+            if field in legacy.options:
+                new_options[field] = legacy.options[field]
+
+        # Ensure unique name
+        new_data["name"] = await self._ensure_unique_name(new_data["name"])
+
+        # Create title
+        type_labels = {
+            SensorType.BLIND: "Vertical",
+            SensorType.AWNING: "Horizontal",
+            SensorType.TILT: "Tilt",
+        }
+        sensor_type = new_data[CONF_SENSOR_TYPE]
+        title = f"{type_labels.get(sensor_type, 'Unknown')} {new_data['name']}"
+
+        # Update context for next iteration
+        self.context["import_index"] = current_index + 1
+        self.context["imported_count"] = self.context.get("imported_count", 0) + 1
+
+        # Create the entry
+        return self.async_create_entry(
+            title=title,
+            data=new_data,
+            options=new_options,
         )
 
 
