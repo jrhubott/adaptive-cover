@@ -133,6 +133,35 @@ Config is stored in two layers:
 - Keep commits atomic and focused
 - Never refactor code unless explicitly asked
 
+## Feature Planning
+
+### Features Planned Section
+
+The README.md file contains a "Features Planned" section that tracks upcoming features and enhancements:
+
+**Location:** [README.md - Features Planned](../README.md#features-planned)
+
+**Guidelines:**
+1. **Check for New Features**: When asked to add new functionality, consult the Features Planned section first to see if it's already listed
+2. **Suggest from the List**: Proactively suggest implementing features from this list when appropriate
+3. **Cross Off Completed Features**: When implementing a planned feature, use strikethrough markdown (`~~feature name~~`) to mark it as completed
+4. **Add New Features**: If a user requests a feature that should be planned, add it to this section in the README
+
+**Format:**
+```markdown
+- Feature category
+  - ~~Completed feature~~
+  - Pending feature
+  - Another pending feature
+```
+
+**Example Workflow:**
+1. User asks to add unit system support
+2. Check Features Planned section - it's already listed
+3. Implement the feature
+4. Update README.md: Change `- Support Home Assistant unit system` to `- ~~Support Home Assistant unit system~~`
+5. Mention in commit message and release notes that this was a planned feature
+
 ## Release Process
 
 ### Creating Releases
