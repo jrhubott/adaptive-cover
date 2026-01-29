@@ -391,6 +391,8 @@ When climate mode is setup you will also get these entities:
   - ~~Reset button~~
   - Wait until next manual/none adaptive change
 
+- Support Home Assistant unit system (automatic conversion between °F/°C, meters/feet, etc.)
+
 - ~~Algorithm to control radiation and/or illumination~~
 
 ### Simulation
