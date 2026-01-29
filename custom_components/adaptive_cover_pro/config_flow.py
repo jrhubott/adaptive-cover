@@ -132,12 +132,12 @@ OPTIONS = vol.Schema(
         ),
         vol.Required(CONF_FOV_LEFT, default=90): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=1, max=90, step=1, mode="slider", unit_of_measurement="°"
+                min=0, max=180, step=1, mode="slider", unit_of_measurement="°"
             )
         ),
         vol.Required(CONF_FOV_RIGHT, default=90): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=1, max=90, step=1, mode="slider", unit_of_measurement="°"
+                min=0, max=180, step=1, mode="slider", unit_of_measurement="°"
             )
         ),
         vol.Required(CONF_SUNSET_POS, default=0): selector.NumberSelector(
