@@ -57,6 +57,9 @@ This fork includes enhancements and modifications, but the core functionality an
 - Sensors for `start` and `end` time
 - Auto manual override detection
 - Smart device naming - automatically suggests device names based on your cover entities
+- Support for both position-capable and open/close-only covers
+  - Automatic detection of cover capabilities at runtime
+  - Configurable threshold for open/close decision (default 50%)
 
 - **Climate Mode**
 
@@ -120,6 +123,25 @@ Weather entities in Home Assistant may not always reflect real-time conditions a
 - Consider using **lux sensors** or **irradiance sensors** for more accurate real-time light level detection
 - The integration supports both `Lux Entity` and `Irradiance Entity` for direct sunlight measurement
 - If using weather entities, verify they update frequently enough for your needs (every 5-15 minutes is ideal)
+
+### Open/Close-Only Covers
+
+Covers that only support OPEN and CLOSE commands (no position control) are supported with threshold-based control:
+
+- The integration calculates position as normal (0-100%)
+- If calculated position ≥ threshold → cover opens
+- If calculated position < threshold → cover closes
+- Default threshold is 50% (adjustable in Automation settings, 1-99%)
+
+**Limitations:**
+- Granular position control is not possible
+- Intermediate positions are not available
+- Tilt covers must support SET_TILT_POSITION (open/close mode not supported)
+
+**Example Use Cases:**
+- Simple roller shutters with only up/down buttons
+- Garage doors with open/close only
+- Budget blinds without position feedback
 
 ## Installation
 

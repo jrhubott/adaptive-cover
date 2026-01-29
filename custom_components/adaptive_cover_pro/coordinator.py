@@ -96,10 +96,17 @@ from .const import (
     CONF_TRANSPARENT_BLIND,
     CONF_WEATHER_ENTITY,
     CONF_WEATHER_STATE,
+    CONF_OPEN_CLOSE_THRESHOLD,
     DOMAIN,
     LOGGER,
 )
-from .helpers import get_datetime_from_str, get_last_updated, get_safe_state
+from .helpers import (
+    get_datetime_from_str,
+    get_last_updated,
+    get_safe_state,
+    check_cover_features,
+    get_open_close_state,
+)
 
 
 @dataclass
@@ -159,7 +166,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.climate_state = None
         self.control_method = "intermediate"
         self.state_change_data: StateChangedData | None = None
-        self.manager = AdaptiveCoverManager(self.manual_duration, self.logger)
+        self.manager = AdaptiveCoverManager(self.hass, self.manual_duration, self.logger)
         self.wait_for_target = {}
         self.target_call = {}
         self.ignore_intermediate_states = self.config_entry.options.get(
@@ -169,6 +176,8 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._scheduled_time = dt.datetime.now()
 
         self._cached_options = None
+        self._cover_capabilities: dict[str, dict[str, bool]] = {}  # Cache capabilities per entity
+        self._open_close_threshold = self.config_entry.options.get(CONF_OPEN_CLOSE_THRESHOLD, 50)
 
     async def async_config_entry_first_refresh(self) -> None:
         """Config entry first refresh."""
@@ -234,11 +243,20 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.logger.debug("Ignoring intermediate state change for %s", entity_id)
             return
         if self.wait_for_target.get(entity_id):
-            position = event.new_state.attributes.get(
-                "current_position"
-                if self._cover_type != "cover_tilt"
-                else "current_tilt_position"
-            )
+            caps = self._cover_capabilities.get(entity_id, {})
+
+            # Get position based on capability
+            if self._cover_type == "cover_tilt":
+                if caps.get("has_set_tilt_position", True):
+                    position = event.new_state.attributes.get("current_tilt_position")
+                else:
+                    position = get_open_close_state(self.hass, entity_id)
+            else:
+                if caps.get("has_set_position", True):
+                    position = event.new_state.attributes.get("current_position")
+                else:
+                    position = get_open_close_state(self.hass, entity_id)
+
             if position == self.target_call.get(entity_id):
                 self.wait_for_target[entity_id] = False
                 self.logger.debug("Position %s reached for %s", position, entity_id)
@@ -432,11 +450,23 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         await self.async_set_manual_position(entity, state)
 
     async def async_set_manual_position(self, entity, state):
-        """Call service to set cover position."""
-        if self.check_position(entity, state):
+        """Call service to set cover position or open/close based on capability."""
+        if not self.check_position(entity, state):
+            return
+
+        caps = self._cover_capabilities.get(entity, {})
+
+        # Determine if cover supports position control
+        supports_position = False
+        if self._cover_type == "cover_tilt":
+            supports_position = caps.get("has_set_tilt_position", True)
+        else:
+            supports_position = caps.get("has_set_position", True)
+
+        if supports_position:
+            # Use position control (existing behavior)
             service = SERVICE_SET_COVER_POSITION
-            service_data = {}
-            service_data[ATTR_ENTITY_ID] = entity
+            service_data = {ATTR_ENTITY_ID: entity}
 
             if self._cover_type == "cover_tilt":
                 service = SERVICE_SET_COVER_TILT_POSITION
@@ -451,8 +481,38 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self.wait_for_target,
                 self.target_call,
             )
-            self.logger.debug("Run %s with data %s", service, service_data)
-            await self.hass.services.async_call(COVER_DOMAIN, service, service_data)
+        else:
+            # Use open/close control (new behavior)
+            has_open = caps.get("has_open", False)
+            has_close = caps.get("has_close", False)
+
+            if not has_open or not has_close:
+                self.logger.warning(
+                    "Cover %s does not support both open and close. Skipping.",
+                    entity,
+                )
+                return
+
+            # Apply threshold
+            if state >= self._open_close_threshold:
+                service = "open_cover"
+                self.target_call[entity] = 100
+            else:
+                service = "close_cover"
+                self.target_call[entity] = 0
+
+            service_data = {ATTR_ENTITY_ID: entity}
+            self.wait_for_target[entity] = True
+
+            self.logger.debug(
+                "Using open/close control: state=%s, threshold=%s, service=%s",
+                state,
+                self._open_close_threshold,
+                service,
+            )
+
+        self.logger.debug("Run %s with data %s", service, service_data)
+        await self.hass.services.async_call(COVER_DOMAIN, service, service_data)
 
     def _update_options(self, options):
         """Update options."""
@@ -472,12 +532,25 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.end_value = options.get(CONF_INTERP_END)
         self.normal_list = options.get(CONF_INTERP_LIST)
         self.new_list = options.get(CONF_INTERP_LIST_NEW)
+        self._open_close_threshold = options.get(CONF_OPEN_CLOSE_THRESHOLD, 50)
 
     def _update_manager_and_covers(self):
         self.manager.add_covers(self.entities)
         if not self._manual_toggle:
             for entity in self.manager.manual_controlled:
                 self.manager.reset(entity)
+        self._ensure_cover_capabilities()
+
+    def _ensure_cover_capabilities(self):
+        """Ensure capabilities are cached for all managed covers."""
+        for entity in self.entities:
+            if entity not in self._cover_capabilities:
+                self._cover_capabilities[entity] = check_cover_features(self.hass, entity)
+                self.logger.debug(
+                    "Cached capabilities for %s: %s",
+                    entity,
+                    self._cover_capabilities[entity],
+                )
 
     def get_blind_data(self, options):
         """Assign correct class for type of blind."""
@@ -567,10 +640,23 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         return True
 
     def _get_current_position(self, entity) -> int | None:
-        """Get current position of cover."""
+        """Get current position of cover.
+
+        For position-capable covers, returns current_position or current_tilt_position.
+        For open/close-only covers, maps state to 0 (closed) or 100 (open).
+        """
+        caps = self._cover_capabilities.get(entity, {})
+
+        # Check if cover supports position
         if self._cover_type == "cover_tilt":
-            return state_attr(self.hass, entity, "current_tilt_position")
-        return state_attr(self.hass, entity, "current_position")
+            if caps.get("has_set_tilt_position", True):  # Default True for backward compat
+                return state_attr(self.hass, entity, "current_tilt_position")
+        else:
+            if caps.get("has_set_position", True):  # Default True for backward compat
+                return state_attr(self.hass, entity, "current_position")
+
+        # Fallback to open/close state mapping
+        return get_open_close_state(self.hass, entity)
 
     def check_position(self, entity, state):
         """Check if position is different as state."""
@@ -824,8 +910,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 class AdaptiveCoverManager:
     """Track position changes."""
 
-    def __init__(self, reset_duration: dict[str:int], logger) -> None:
+    def __init__(self, hass: HomeAssistant, reset_duration: dict[str:int], logger) -> None:
         """Initialize the AdaptiveCoverManager."""
+        self.hass = hass
         self.covers: set[str] = set()
 
         self.manual_control: dict[str, bool] = {}
@@ -862,6 +949,10 @@ class AdaptiveCoverManager:
             new_position = new_state.attributes.get("current_tilt_position")
         else:
             new_position = new_state.attributes.get("current_position")
+
+        # If position is None, try mapping from open/close state
+        if new_position is None:
+            new_position = get_open_close_state(self.hass, entity_id)
 
         if new_position != our_state:
             if (

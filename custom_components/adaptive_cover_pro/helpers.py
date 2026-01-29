@@ -53,3 +53,54 @@ def dt_check_time_passed(time: dt.datetime):
     if now.date() == time.date():
         return now.time() > time.time()
     return True
+
+
+def check_cover_features(hass: HomeAssistant, entity_id: str) -> dict[str, bool]:
+    """Check which features a cover entity supports.
+
+    Returns dict with keys:
+    - has_set_position: bool
+    - has_set_tilt_position: bool
+    - has_open: bool
+    - has_close: bool
+    """
+    from homeassistant.components.cover import CoverEntityFeature
+
+    state = hass.states.get(entity_id)
+    if not state:
+        return {
+            "has_set_position": False,
+            "has_set_tilt_position": False,
+            "has_open": False,
+            "has_close": False,
+        }
+
+    supported_features = state.attributes.get("supported_features", 0)
+
+    return {
+        "has_set_position": bool(supported_features & CoverEntityFeature.SET_POSITION),
+        "has_set_tilt_position": bool(supported_features & CoverEntityFeature.SET_TILT_POSITION),
+        "has_open": bool(supported_features & CoverEntityFeature.OPEN),
+        "has_close": bool(supported_features & CoverEntityFeature.CLOSE),
+    }
+
+
+def get_open_close_state(hass: HomeAssistant, entity_id: str) -> int | None:
+    """Map open/closed state to position value for open/close-only covers.
+
+    Returns:
+    - 0 if closed
+    - 100 if open
+    - None if state is unknown/unavailable
+
+    """
+    state = hass.states.get(entity_id)
+    if not state or state.state in ["unknown", "unavailable"]:
+        return None
+
+    if state.state == "closed":
+        return 0
+    elif state.state == "open":
+        return 100
+
+    return None
