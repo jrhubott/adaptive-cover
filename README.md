@@ -21,6 +21,7 @@ This fork includes enhancements and modifications, but the core functionality an
   - [Credits](#credits)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
+  - [Known Limitations & Best Practices](#known-limitations--best-practices)
   - [Installation](#installation)
     - [HACS (Recommended)](#hacs-recommended)
     - [Manual](#manual)
@@ -72,6 +73,53 @@ This fork includes enhancements and modifications, but the core functionality an
   - Set start time to prevent opening blinds while you are asleep
   - Set minimum interval time between position changes
   - set minimum percentage change
+
+## Known Limitations & Best Practices
+
+### Temperature Unit Consistency
+**IMPORTANT:** All temperature sensors used in Climate mode must use the same unit system. The integration currently does not perform automatic unit conversion between Fahrenheit and Celsius.
+
+- If your `Indoor Temperature Entity` reports in Celsius, your `Outdoor Temperature Entity` must also report in Celsius
+- The `Minimum Comfort Temperature` and `Maximum Comfort Temperature` values should match your sensor units
+- Mixing °F and °C will result in incorrect calculations
+
+**Workaround:** Ensure all climate entities report in the same units, or use template sensors to convert them to a consistent unit.
+
+**Future:** Automatic unit system support is planned (see [Features Planned](#features-planned))
+
+### Start with Basic Mode
+If you're new to Adaptive Cover Pro, we strongly recommend:
+
+1. **Start with Basic Mode** - Configure and test basic sun position-based control first
+2. **Understand the calculations** - Observe how your covers respond to sun position throughout the day
+3. **Add Climate Mode gradually** - Once comfortable with Basic Mode, enable Climate Mode and add temperature/presence features incrementally
+
+Climate Mode introduces additional complexity with temperature thresholds, presence detection, and weather conditions. Understanding Basic Mode operation first will help you troubleshoot issues more effectively.
+
+### Venetian Blinds (Dual Control)
+Home Assistant cover entities can only control a single dimension (position OR tilt angle, not both simultaneously). For venetian blinds that support both vertical movement and slat tilting:
+
+**You must create TWO separate Adaptive Cover Pro instances:**
+1. **Vertical instance** - Controls up/down position using the same cover entity
+2. **Tilt instance** - Controls slat angle using the same cover entity
+
+**Example:**
+- Instance 1: "Adaptive Office Blind Vertical" → Controls `cover.office_blind` position (0-100%)
+- Instance 2: "Adaptive Office Blind Tilt" → Controls `cover.office_blind` tilt angle (0-100%)
+
+Both instances monitor the sun independently and send appropriate commands to the same physical device.
+
+### Weather Entity Reliability
+Weather entities in Home Assistant may not always reflect real-time conditions accurately, which can affect Climate Mode operation:
+
+- Weather forecasts may lag actual conditions
+- Some integrations update infrequently (e.g., hourly)
+- Not all weather services distinguish between types of cloud cover
+
+**Recommendations:**
+- Consider using **lux sensors** or **irradiance sensors** for more accurate real-time light level detection
+- The integration supports both `Lux Entity` and `Irradiance Entity` for direct sunlight measurement
+- If using weather entities, verify they update frequently enough for your needs (every 5-15 minutes is ideal)
 
 ## Installation
 
@@ -179,6 +227,7 @@ During setup, the integration will automatically suggest a device name based on 
 |              | ![alt text](images/image.png) | ![alt text](images/image-2.png) | ![alt text](images/image-1.png) |
 | **Movement** | Up/Down                       | In/Out                          | Tilting                         |
 |              | [variables](#vertical)        | [variables](#horizontal)        | [variables](#tilt)              |
+| **Note**     |                               |                                 | For venetian blinds with both vertical and tilt capabilities, see [Known Limitations](#known-limitations--best-practices) |
 
 ## Modes
 
@@ -240,6 +289,11 @@ This component supports two strategy modes: A `basic` mode and a `climate comfor
 This mode uses the calculated position when the sun is within the specified azimuth range of the window. Else it defaults to the default value or after sunset value depending on the time of day.
 
 ### Climate mode
+
+> **⚠️ Start with Basic Mode First**
+> Climate mode adds significant complexity with temperature thresholds, presence detection, and weather conditions. We recommend configuring Basic mode first and ensuring it works correctly before enabling Climate mode features.
+>
+> **Temperature Unit Consistency Required:** All temperature sensors must use the same unit system (°C or °F). The integration does not automatically convert between units. See [Known Limitations](#known-limitations--best-practices) for details.
 
 This mode calculates the position based on extra parameters for presence, indoor temperature, minimal comfort temperature, maximum comfort temperature and weather (optional).
 This mode is split up in two types of strategies; [Presence](https://github.com/jrhubott/adaptive-cover?tab=readme-ov-file#presence) and [No Presence](https://github.com/jrhubott/adaptive-cover?tab=readme-ov-file#no-presence).
@@ -392,6 +446,8 @@ When climate mode is setup you will also get these entities:
   - Wait until next manual/none adaptive change
 
 - Support Home Assistant unit system (automatic conversion between °F/°C, meters/feet, etc.)
+  - This will resolve the current requirement for all temperature sensors to use matching units
+  - Will automatically handle conversions based on your Home Assistant unit system preference
 
 - ~~Algorithm to control radiation and/or illumination~~
 
