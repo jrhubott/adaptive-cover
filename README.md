@@ -283,7 +283,7 @@ These entities are always available:
 | Entities | Default | Description |
 | --------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `sensor.{device_name}_cover_position` | | Reflects the current state determined by predefined settings and factors such as sun position, weather, and temperature |
-| `sensor.{device_name}_control_method` | `intermediate` | Indicates the active control strategy based on weather conditions. Options include `winter`, `summer`, and `intermediate` |
+| `sensor.{device_name}_control_method` | `intermediate` | **Climate Control Strategy Indicator**: Shows the active climate control strategy when climate mode is enabled. **`intermediate`** - Temperature is between comfort thresholds; uses calculated sun position. **`winter`** - Indoor temperature is below minimum comfort temperature; opens covers fully when sun is present to maximize solar heat gain. **`summer`** - Indoor temperature is above maximum comfort temperature; closes covers to block heat and prevent further temperature rise. This sensor helps you understand why covers are positioned differently based on climate conditions. |
 | `sensor.{device_name}_start_sun` | | Shows the starting time when the sun enters the window's view, with an interval of every 5 minutes. |
 | `sensor.{device_name}_end_sun` | | Indicates the ending time when the sun exits the window's view, with an interval of every 5 minutes. |
 | `binary_sensor.{device_name}_manual_override` | `off` | Indicates if manual override is engaged for any blinds. |
