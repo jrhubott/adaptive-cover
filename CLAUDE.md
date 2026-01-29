@@ -128,6 +128,11 @@ Config is stored in two layers:
 4. **Entity Platform Pattern** - Separate platform files register entities
 5. **Config Flow Pattern** - Multi-step UI-based configuration
 
+## Workflow Rules
+- ALWAYS create a git branch before making changes
+- Keep commits atomic and focused
+- Never refactor code unless explicitly asked.
+
 ## Testing
 
 ### Manual Testing
