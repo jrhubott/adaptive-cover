@@ -73,6 +73,7 @@ CONF_MANUAL_OVERRIDE_DURATION = "manual_override_duration"
 CONF_MANUAL_OVERRIDE_RESET = "manual_override_reset"
 CONF_MANUAL_THRESHOLD = "manual_threshold"
 CONF_MANUAL_IGNORE_INTERMEDIATE = "manual_ignore_intermediate"
+CONF_OPEN_CLOSE_THRESHOLD = "open_close_threshold"
 
 # Import flow constants
 LEGACY_DOMAIN = "adaptive_cover"

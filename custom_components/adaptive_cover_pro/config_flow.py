@@ -48,6 +48,7 @@ from .const import (
     CONF_MANUAL_OVERRIDE_DURATION,
     CONF_MANUAL_OVERRIDE_RESET,
     CONF_MANUAL_THRESHOLD,
+    CONF_OPEN_CLOSE_THRESHOLD,
     CONF_MAX_ELEVATION,
     CONF_MAX_POSITION,
     CONF_MIN_ELEVATION,
@@ -164,7 +165,6 @@ VERTICAL_OPTIONS = vol.Schema(
                 multiple=True,
                 filter=selector.EntityFilterSelectorConfig(
                     domain="cover",
-                    supported_features=["cover.CoverEntityFeature.SET_POSITION"],
                 ),
             )
         ),
@@ -339,6 +339,11 @@ AUTOMATION_CONFIG = vol.Schema(
             vol.Coerce(int), vol.Range(min=0, max=99)
         ),
         vol.Optional(CONF_MANUAL_IGNORE_INTERMEDIATE, default=False): bool,
+        vol.Optional(CONF_OPEN_CLOSE_THRESHOLD, default=50): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1, max=99, step=1, mode="slider", unit_of_measurement="%"
+            )
+        ),
         vol.Optional(CONF_END_TIME, default="00:00:00"): selector.TimeSelector(),
         vol.Optional(CONF_END_ENTITY): selector.EntitySelector(
             selector.EntitySelectorConfig(domain=["sensor", "input_datetime"])
@@ -692,6 +697,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 CONF_MANUAL_IGNORE_INTERMEDIATE: self.config.get(
                     CONF_MANUAL_IGNORE_INTERMEDIATE
                 ),
+                CONF_OPEN_CLOSE_THRESHOLD: self.config.get(CONF_OPEN_CLOSE_THRESHOLD, 50),
                 CONF_BLIND_SPOT_RIGHT: self.config.get(CONF_BLIND_SPOT_RIGHT, None),
                 CONF_BLIND_SPOT_LEFT: self.config.get(CONF_BLIND_SPOT_LEFT, None),
                 CONF_BLIND_SPOT_ELEVATION: self.config.get(

@@ -129,7 +129,7 @@ Config is stored in two layers:
 5. **Config Flow Pattern** - Multi-step UI-based configuration
 
 ## Workflow Rules
-- ALWAYS create a git branch before making changes
+- ALWAYS create a git feature branch before making changes
 - Keep commits atomic and focused
 - Never refactor code unless explicitly asked
 
@@ -216,6 +216,7 @@ When creating releases, follow these guidelines:
    - Mark as prerelease: `gh release edit vX.Y.Z-beta.N --prerelease`
    - Include clear testing instructions
    - Warn users this is for testing purposes
+   - If the current branch is a feature branch assume that a Beta Release is being created
 
 ## Testing
 
