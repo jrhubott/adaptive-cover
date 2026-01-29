@@ -128,6 +128,66 @@ Config is stored in two layers:
 4. **Entity Platform Pattern** - Separate platform files register entities
 5. **Config Flow Pattern** - Multi-step UI-based configuration
 
+## Workflow Rules
+- ALWAYS create a git branch before making changes
+- Keep commits atomic and focused
+- Never refactor code unless explicitly asked
+
+## Release Process
+
+### Creating Releases
+
+When creating releases, follow these guidelines:
+
+1. **Version Numbering**
+   - Use semantic versioning: `MAJOR.MINOR.PATCH`
+   - Beta releases: `MAJOR.MINOR.PATCH-beta.N`
+   - Update version in `custom_components/adaptive_cover_pro/manifest.json`
+
+2. **Git Tags**
+   - Create annotated tags: `git tag -a vX.Y.Z -m "Release notes"`
+   - Tag format must match `v*.*.*` to trigger the release workflow
+   - Beta tags like `v2.3.0-beta.1` are supported
+
+3. **Release Notes**
+   - **NEVER** include `Co-Authored-By:` lines in release notes
+   - Use clear, user-friendly language with emoji section headers
+   - Include: Features, Documentation, Technical Details, Installation, Testing sections
+   - For beta releases, mark as prerelease and include testing guidance
+
+4. **Automated Release Workflow**
+   - Pushing a tag matching `v*.*.*` triggers `.github/workflows/publish-release.yml`
+   - The workflow automatically:
+     - Creates a GitHub release
+     - ZIPs the `custom_components/adaptive_cover_pro` directory
+     - Uploads `adaptive_cover_pro.zip` as a release asset
+   - **IMPORTANT**: Always verify that `adaptive_cover_pro.zip` is attached to the release
+   - If the ZIP is missing, the workflow may have failed - check GitHub Actions logs
+
+5. **Release Creation Steps**
+   ```bash
+   # 1. Update version in manifest.json
+   # 2. Commit the version bump
+   git add custom_components/adaptive_cover_pro/manifest.json
+   git commit -m "chore: Bump version to vX.Y.Z"
+
+   # 3. Create and push tag (triggers workflow)
+   git tag -a vX.Y.Z -m "Release notes here (NO Co-Authored-By)"
+   git push origin vX.Y.Z
+
+   # 4. Wait for workflow to complete (~15 seconds)
+   # 5. Edit release to update notes and mark as prerelease if needed
+   gh release edit vX.Y.Z --title "Title" --notes "Notes" --prerelease
+
+   # 6. Verify ZIP asset exists
+   gh release view vX.Y.Z --json assets
+   ```
+
+6. **Beta Releases**
+   - Mark as prerelease: `gh release edit vX.Y.Z-beta.N --prerelease`
+   - Include clear testing instructions
+   - Warn users this is for testing purposes
+
 ## Testing
 
 ### Manual Testing
