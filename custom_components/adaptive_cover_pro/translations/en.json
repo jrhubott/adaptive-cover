@@ -26,7 +26,9 @@
           "end_entity": "Entity indicating ending time",
           "manual_threshold": "Manual override threshold",
           "manual_ignore_intermediate": "Ignore intermediate positions during manual override (opening and closing)",
-          "return_sunset": "Always adjust position to sunset default at end time; Useful if end time is before actual sunset"
+          "return_sunset": "Always adjust position to sunset default at end time; Useful if end time is before actual sunset",
+          "open_close_threshold": "Open/Close threshold",
+          "enable_diagnostics": "Enable diagnostic entities"
         },
         "data_description": {
           "delta_position": "Minimum position change (%) required before adjusting the cover. Prevents tiny adjustments as sun moves slowly. Typical values: 1-2% (very responsive, may adjust frequently), 5% (balanced, recommended for most), 10% (less frequent, larger movements). Example: If cover is at 30% and sun moves slightly, only adjust if new position is 35% or more (with 5% threshold). Reduces motor wear and noise from constant tiny adjustments.",
@@ -39,7 +41,9 @@
           "end_entity": "Entity representing ending time state, overriding the fixed end time set above. Useful for automating the end time with an entity (e.g., sensor that provides bedtime based on calendar or daily routine).",
           "manual_threshold": "Position difference (%) that counts as 'manual override' (default: 1%). If you manually move cover by this amount, override detection triggers. Typical values: 1-2% (sensitive, detects small adjustments), 5% (less sensitive, recommended), 10% (only large manual changes count). Prevents accidental override detection from small motor drifts or position reporting variations.",
           "manual_ignore_intermediate": "Ignore intermediate positions during manual opening and closing operations. Enable this to prevent override detection from transitional positions while the cover is moving to your target position. Useful if your cover reports many intermediate values during movement.",
-          "return_sunset": "Always adjust position to sunset default at end time, even if it's before actual sunset. Enable this to ensure the cover moves to sunset position when the end time is reached, rather than waiting for astronomical sunset. Useful if your end time is before sunset and you want consistent evening positioning."
+          "return_sunset": "Always adjust position to sunset default at end time, even if it's before actual sunset. Enable this to ensure the cover moves to sunset position when the end time is reached, rather than waiting for astronomical sunset. Useful if your end time is before sunset and you want consistent evening positioning.",
+          "open_close_threshold": "Position threshold for covers that only support open/close commands (not position control). When the calculated position is greater than or equal to this threshold, the cover opens; when below, it closes. Default: 50% (opens at midpoint or above). Higher values (60-70%) keep cover closed more often, lower values (30-40%) open more often. Only affects covers without position support - covers with position control ignore this setting and use exact calculated positions.",
+          "enable_diagnostics": "Enable additional diagnostic sensor entities for debugging and monitoring. When enabled, creates extra entities that show: solar position (azimuth/elevation), last cover action details, control method status, and calculation diagnostics. Default: Disabled (to avoid entity clutter). Enable this if you want detailed visibility into the integration's decision-making process or need to troubleshoot behavior. Diagnostic entities are disabled by default in the UI."
         }
       },
       "vertical": {
@@ -289,7 +293,9 @@
           "end_entity": "Entity indicating ending time",
           "manual_threshold": "Manual override threshold",
           "manual_ignore_intermediate": "Ignore intermediate positions during manual override (opening and closing)",
-          "return_sunset": "Always adjust position to sunset default at end time; Useful if end time is before actual sunset"
+          "return_sunset": "Always adjust position to sunset default at end time; Useful if end time is before actual sunset",
+          "open_close_threshold": "Open/Close threshold",
+          "enable_diagnostics": "Enable diagnostic entities"
         },
         "data_description": {
           "delta_position": "Minimum position change (%) required before adjusting the cover. Prevents tiny adjustments as sun moves slowly. Typical values: 1-2% (very responsive, may adjust frequently), 5% (balanced, recommended for most), 10% (less frequent, larger movements). Example: If cover is at 30% and sun moves slightly, only adjust if new position is 35% or more (with 5% threshold). Reduces motor wear and noise from constant tiny adjustments.",
@@ -302,7 +308,9 @@
           "end_entity": "Entity representing ending time state, overriding the fixed end time set above. Useful for automating the end time with an entity (e.g., sensor that provides bedtime based on calendar or daily routine).",
           "manual_threshold": "Position difference (%) that counts as 'manual override' (default: 1%). If you manually move cover by this amount, override detection triggers. Typical values: 1-2% (sensitive, detects small adjustments), 5% (less sensitive, recommended), 10% (only large manual changes count). Prevents accidental override detection from small motor drifts or position reporting variations.",
           "manual_ignore_intermediate": "Ignore intermediate positions during manual opening and closing operations. Enable this to prevent override detection from transitional positions while the cover is moving to your target position. Useful if your cover reports many intermediate values during movement.",
-          "return_sunset": "Always adjust position to sunset default at end time, even if it's before actual sunset. Enable this to ensure the cover moves to sunset position when the end time is reached, rather than waiting for astronomical sunset. Useful if your end time is before sunset and you want consistent evening positioning."
+          "return_sunset": "Always adjust position to sunset default at end time, even if it's before actual sunset. Enable this to ensure the cover moves to sunset position when the end time is reached, rather than waiting for astronomical sunset. Useful if your end time is before sunset and you want consistent evening positioning.",
+          "open_close_threshold": "Position threshold for covers that only support open/close commands (not position control). When the calculated position is greater than or equal to this threshold, the cover opens; when below, it closes. Default: 50% (opens at midpoint or above). Higher values (60-70%) keep cover closed more often, lower values (30-40%) open more often. Only affects covers without position support - covers with position control ignore this setting and use exact calculated positions.",
+          "enable_diagnostics": "Enable additional diagnostic sensor entities for debugging and monitoring. When enabled, creates extra entities that show: solar position (azimuth/elevation), last cover action details, control method status, and calculation diagnostics. Default: Disabled (to avoid entity clutter). Enable this if you want detailed visibility into the integration's decision-making process or need to troubleshoot behavior. Diagnostic entities are disabled by default in the UI."
         }
       },
       "vertical": {
