@@ -373,7 +373,7 @@ When creating releases, follow these guidelines:
 
    **Automated (Recommended):**
    ```bash
-   # Generate release notes in tmp directory
+   # 1. Generate release notes in tmp directory
    cat > /tmp/release_notes.md << 'EOF'
    ## 🎯 Release Title
 
@@ -391,16 +391,18 @@ When creating releases, follow these guidelines:
    - Home Assistant 2024.5.0+
    EOF
 
-   # Pass notes file to release script (NEVER use --editor)
-   ./scripts/release patch --notes /tmp/release_notes.md --yes
-   ./scripts/release beta --notes /tmp/release_notes.md --yes
+   # 2. Pass notes file to release script (works for ALL release types)
+   ./scripts/release patch --notes /tmp/release_notes.md --yes    # Patch release
+   ./scripts/release minor --notes /tmp/release_notes.md --yes    # Minor release
+   ./scripts/release major --notes /tmp/release_notes.md --yes    # Major release
+   ./scripts/release beta --notes /tmp/release_notes.md --yes     # Beta release
 
    # For help with all options
    ./scripts/release --help
    ```
 
-   **IMPORTANT:** Always generate notes in `/tmp/release_notes.md` and use `--notes` parameter.
-   Do NOT use `--editor` parameter as it opens an interactive editor.
+   **IMPORTANT:** Always generate notes in `/tmp/release_notes.md` and use `--notes` parameter
+   for **ALL release types** (patch, minor, major, beta). Do NOT use `--editor` parameter.
 
    **Manual (Fallback):**
    ```bash
