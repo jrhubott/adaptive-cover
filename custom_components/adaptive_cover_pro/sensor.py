@@ -149,6 +149,17 @@ async def async_setup_entry(
             )
         )
 
+        # P0: Last Cover Action
+        entities.append(
+            AdaptiveCoverLastActionSensor(
+                config_entry.entry_id,
+                hass,
+                config_entry,
+                name,
+                coordinator,
+            )
+        )
+
         # P1: Advanced diagnostic sensors (disabled by default)
         # Only add climate-specific sensors if climate mode is enabled
         if config_entry.options.get(CONF_CLIMATE_MODE, False):
@@ -639,3 +650,85 @@ class AdaptiveCoverAdvancedDiagnosticEnumSensor(AdaptiveCoverDiagnosticEnumSenso
         if self.data.diagnostics is None:
             return None
         return self.data.diagnostics.get(self._diagnostic_key)
+
+
+class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
+    """Sensor showing the last cover action performed."""
+
+    def __init__(
+        self,
+        config_entry_id: str,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        name: str,
+        coordinator: AdaptiveDataUpdateCoordinator,
+    ):
+        """Initialize the sensor."""
+        super().__init__(
+            config_entry_id,
+            hass,
+            config_entry,
+            name,
+            coordinator,
+            "Last Cover Action",
+            "last_cover_action",
+            "mdi:history",
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the state of the sensor."""
+        if not self.data or not self.data.diagnostics:
+            return None
+
+        action = self.data.diagnostics.get("last_cover_action")
+        if not action or not action.get("entity_id"):
+            return "No action recorded"
+
+        # Format: "service → entity at timestamp"
+        service = action.get("service", "unknown")
+        entity = action.get("entity_id", "unknown")
+        timestamp_str = action.get("timestamp", "")
+
+        # Parse and format timestamp to be more readable
+        if timestamp_str:
+            try:
+                from homeassistant import util as dt_util
+
+                ts = dt_util.parse_datetime(timestamp_str)
+                if ts:
+                    time_str = ts.strftime("%H:%M:%S")
+                    return f"{service} → {entity.split('.')[-1]} at {time_str}"
+            except (ValueError, AttributeError):
+                pass
+
+        return f"{service} → {entity.split('.')[-1]}"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return additional attributes."""
+        if not self.data or not self.data.diagnostics:
+            return None
+
+        action = self.data.diagnostics.get("last_cover_action")
+        if not action or not action.get("entity_id"):
+            return None
+
+        attrs = {
+            "entity_id": action.get("entity_id"),
+            "service": action.get("service"),
+            "position": action.get("position"),
+            "calculated_position": action.get("calculated_position"),
+            "inverse_state_applied": action.get("inverse_state_applied", False),
+            "timestamp": action.get("timestamp"),
+            "covers_controlled": action.get("covers_controlled", 1),
+        }
+
+        # Only include threshold for open/close-only covers
+        if action.get("threshold_used") is not None:
+            attrs["threshold_used"] = action.get("threshold_used")
+            attrs["threshold_comparison"] = (
+                f"{action.get('calculated_position')} >= {action.get('threshold_used')}"
+            )
+
+        return attrs

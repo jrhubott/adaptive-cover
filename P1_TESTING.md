@@ -155,6 +155,39 @@ These are **disabled by default** when diagnostics is enabled (users must enable
 - They appear in the diagnostic section of the device page
 - They don't clutter the main entity list
 
+## Last Cover Action Sensor (P0)
+
+**Purpose:** Shows the most recent cover action performed by the integration. This is a P0 sensor, enabled by default when diagnostics are enabled.
+
+### Setup
+1. Enable diagnostics in automation settings (sensor will be automatically enabled)
+2. Enable automatic control
+3. Trigger position changes (wait for sun to move or use Developer Tools to change sun sensor)
+
+### Expected Behavior
+
+**Position-Capable Covers:**
+- Sensor state: `"set_cover_position → [entity] at 14:30:45"`
+- Attributes show exact position sent
+
+**Open/Close-Only Covers:**
+- Sensor state: `"open_cover → [entity] at 14:30:45"` or `"close_cover → ..."`
+- Attributes show threshold comparison details
+- Example: `calculated_position: 30`, `threshold_used: 50`, `threshold_comparison: "30 >= 50"`
+
+**After Integration Reload:**
+- Sensor shows: `"No action recorded"`
+- Updates after first action
+
+### Testing Checklist
+- [ ] Sensor enabled by default when diagnostics enabled (P0 diagnostic)
+- [ ] Shows correct service name (open_cover, close_cover, set_cover_position, set_cover_tilt_position)
+- [ ] Timestamp updates on each action
+- [ ] Attributes include all relevant data
+- [ ] Works with multiple covers (tracks last action)
+- [ ] Works with inverse_state enabled/disabled
+- [ ] Handles integration reload gracefully
+
 ## Common Issues
 
 ### Sensors Not Created
@@ -187,6 +220,7 @@ These are **disabled by default** when diagnostics is enabled (users must enable
 
 - [ ] P0 sensors are enabled by default when diagnostics enabled
 - [ ] P1 sensors are disabled by default when diagnostics enabled
+- [ ] Last cover action sensor is P0 (enabled by default when diagnostics enabled)
 - [ ] Temperature sensor only created when climate mode enabled
 - [ ] Climate conditions sensor only created when climate mode enabled
 - [ ] Time window sensor always created when diagnostics enabled
@@ -199,6 +233,10 @@ These are **disabled by default** when diagnostics is enabled (users must enable
 - [ ] Time window attributes show time details
 - [ ] Sun validity state shows Valid/In Blind Spot/Invalid
 - [ ] Sun validity attributes show validation details
+- [ ] Last cover action sensor shows "No action recorded" initially
+- [ ] Last cover action sensor updates after first cover action
+- [ ] Last cover action attributes show service, position, timestamp
+- [ ] Last cover action attributes show threshold details for open/close-only covers
 - [ ] Sensors stay enabled/disabled after reload
 - [ ] All sensors appear in diagnostic entity category
 - [ ] Sensors work in dashboards and automations

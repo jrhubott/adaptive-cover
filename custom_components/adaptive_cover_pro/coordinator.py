@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pytz
@@ -182,6 +183,18 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._cached_options = None
         self._cover_capabilities: dict[str, dict[str, bool]] = {}  # Cache capabilities per entity
         self._open_close_threshold = self.config_entry.options.get(CONF_OPEN_CLOSE_THRESHOLD, 50)
+
+        # Track last cover action for diagnostic sensor
+        self.last_cover_action: dict[str, Any] = {
+            "entity_id": None,
+            "service": None,
+            "position": None,
+            "calculated_position": None,
+            "threshold_used": None,
+            "inverse_state_applied": False,
+            "timestamp": None,
+            "covers_controlled": 0,
+        }
 
     async def async_config_entry_first_refresh(self) -> None:
         """Config entry first refresh."""
@@ -531,6 +544,18 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 service,
             )
 
+        # Track action for diagnostic sensor
+        self.last_cover_action = {
+            "entity_id": entity,
+            "service": service,
+            "position": state if supports_position else self.target_call[entity],
+            "calculated_position": state,
+            "threshold_used": self._open_close_threshold if not supports_position else None,
+            "inverse_state_applied": self._inverse_state,
+            "timestamp": dt.datetime.now().isoformat(),
+            "covers_controlled": 1,
+        }
+
         self.logger.debug("Run %s with data %s", service, service_data)
         await self.hass.services.async_call(COVER_DOMAIN, service, service_data)
 
@@ -878,6 +903,10 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 "lux_active": self.climate_data.lux if self.climate_data._use_lux else None,
                 "irradiance_active": self.climate_data.irradiance if self.climate_data._use_irradiance else None,
             }
+
+        # Last cover action tracking
+        if self.last_cover_action.get("entity_id"):
+            diagnostics["last_cover_action"] = self.last_cover_action.copy()
 
         return diagnostics
 
