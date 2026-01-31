@@ -261,6 +261,12 @@ retry_command() {
     local cmd="$*"
     local attempt=1
 
+    # In dry run mode, just log the command
+    if is_dry_run; then
+        log_dry_run "$cmd"
+        return 0
+    fi
+
     while [[ $attempt -le $RETRY_ATTEMPTS ]]; do
         if eval "$cmd"; then
             return 0
