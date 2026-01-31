@@ -2,13 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**For comprehensive developer documentation, see [DEVELOPMENT.md](DEVELOPMENT.md)** - This file contains instructions for Claude Code specifically, while DEVELOPMENT.md is the human-readable developer guide.
+
 ## Project Overview
 
 **Adaptive Cover Pro** is a Home Assistant custom integration that automatically controls vertical blinds, horizontal awnings, and tilted/venetian blinds based on the sun's position. It calculates optimal positions to filter direct sunlight while maximizing natural light and supporting climate-aware operation.
 
 **Language:** Python 3.11+
 **Framework:** Home Assistant Core (async architecture)
-**Version:** 2.5.0-beta.1 (requires Home Assistant 2024.5.0+)
+**Version:** 2.5.0-beta.7 (requires Home Assistant 2024.5.0+)
 
 ## Development Commands
 
@@ -352,6 +354,88 @@ git commit -m "feat: Add feature X
 - Keep table formatting consistent
 - Verify markdown renders correctly
 
+### DEVELOPMENT.md Updates
+
+**CRITICAL:** Always update DEVELOPMENT.md when making changes that affect the development process or workflow.
+
+**When to Update DEVELOPMENT.md:**
+
+1. **New Development Scripts** (scripts/ directory)
+   - Add documentation to "Development Scripts" section
+   - Include purpose, usage, options, and examples
+   - Document what the script does step-by-step
+   - Add troubleshooting tips if applicable
+
+2. **Changes to Release Process**
+   - Update "Release Process" section (~line 150-700)
+   - Document new release script features or options
+   - Update examples if behavior changes
+   - Add new troubleshooting scenarios
+   - Update workflow diagrams if flow changes
+
+3. **Architecture Changes**
+   - Update "Architecture Notes" section
+   - Document new patterns or design decisions
+   - Update data flow diagrams
+   - Add explanations for critical behaviors
+
+4. **New Testing Strategies**
+   - Update "Testing" section
+   - Document new test environments or tools
+   - Add testing examples and best practices
+
+5. **Code Standards Changes**
+   - Update "Code Standards" section
+   - Document new linting rules or conventions
+   - Update import order or style guidelines
+   - Add new best practices
+
+6. **Project Structure Changes**
+   - Update "Project Structure" section (~line 35-80)
+   - Add new directories or major files
+   - Update line counts for major files if significantly changed
+   - Document purpose of new components
+
+7. **Debugging Tools/Techniques**
+   - Update "Debugging" section
+   - Add new common issues and solutions
+   - Document new debugging tools or approaches
+
+**Required Updates:**
+- Keep examples current and working
+- Ensure all script documentation matches actual behavior
+- Maintain accuracy of line number references (approximate is fine)
+- Update workflow diagrams if process changes
+- Add troubleshooting for new error scenarios
+
+**Example Workflow:**
+```bash
+# 1. Make changes to development process (e.g., add new script)
+# 2. Update DEVELOPMENT.md with documentation
+# 3. Test that instructions work
+# 4. Commit both together
+git add scripts/new-script DEVELOPMENT.md
+git commit -m "feat: Add new development script
+
+- Script implementation
+- DEVELOPMENT.md updated with usage documentation"
+```
+
+**Quality Check:**
+- Test all command examples to ensure they work
+- Use consistent formatting with existing documentation
+- Include practical examples for complex features
+- Add visual diagrams (ASCII art) where helpful
+- Cross-reference related sections
+
+**Special Considerations:**
+- **Release Script Documentation:** This is the most detailed section in DEVELOPMENT.md (~400 lines). When updating release process, ensure:
+  - Examples remain current and accurate
+  - Troubleshooting covers new error scenarios
+  - Workflow diagram reflects actual execution flow
+  - All command-line options are documented
+  - CI/CD integration examples work correctly
+
 ## Testing
 
 ### Manual Testing
@@ -370,24 +454,38 @@ git commit -m "feat: Add feature X
 ## File Organization
 
 ```
-custom_components/adaptive_cover_pro/
-├── __init__.py              # Integration entry point
-├── coordinator.py           # Data coordinator (primary hub)
-├── calculation.py           # Position calculation engine
-├── config_flow.py           # Configuration UI
-├── sensor.py                # Sensor platform
-├── switch.py                # Switch platform
-├── binary_sensor.py         # Binary sensor platform
-├── button.py                # Button platform
-├── sun.py                   # Solar calculations
-├── helpers.py               # Utility functions
-├── const.py                 # Constants
-├── config_context_adapter.py # Logging adapter
-├── diagnostics.py           # Diagnostics export
-├── manifest.json            # Integration metadata
-├── translations/            # i18n files (13 languages)
-├── blueprints/              # Automation blueprints
-└── simulation/              # Testing and simulation tools
+adaptive-cover/
+├── custom_components/adaptive_cover_pro/
+│   ├── __init__.py              # Integration entry point
+│   ├── coordinator.py           # Data coordinator (primary hub)
+│   ├── calculation.py           # Position calculation engine
+│   ├── config_flow.py           # Configuration UI
+│   ├── sensor.py                # Sensor platform
+│   ├── switch.py                # Switch platform
+│   ├── binary_sensor.py         # Binary sensor platform
+│   ├── button.py                # Button platform
+│   ├── sun.py                   # Solar calculations
+│   ├── helpers.py               # Utility functions
+│   ├── const.py                 # Constants
+│   ├── config_context_adapter.py # Logging adapter
+│   ├── diagnostics.py           # Diagnostics export
+│   ├── manifest.json            # Integration metadata
+│   ├── translations/            # i18n files (13 languages)
+│   ├── blueprints/              # Automation blueprints
+│   └── simulation/              # Testing and simulation tools
+├── scripts/
+│   ├── setup                    # Development environment setup
+│   ├── develop                  # Start Home Assistant dev server
+│   ├── lint                     # Run linting
+│   └── release                  # Create releases (automated)
+├── config/                      # Test Home Assistant config
+├── notebooks/                   # Jupyter notebooks for testing
+├── .github/workflows/           # GitHub Actions
+│   └── publish-release.yml      # Automated release workflow
+├── DEVELOPMENT.md               # Developer documentation (comprehensive)
+├── CLAUDE.md                    # Instructions for Claude Code (this file)
+├── README.md                    # User documentation
+└── pyproject.toml               # Python project configuration
 ```
 
 ## Dependencies
