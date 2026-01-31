@@ -265,11 +265,21 @@ When creating releases, follow these guidelines:
    gh release view vX.Y.Z --json assets
    ```
 
-6. **Beta Releases**
+6. **Determining Release Type by Branch**
+   - **Feature branch** → Create a beta release (e.g., v2.5.0-beta.1)
+     - Use beta version numbers: `MAJOR.MINOR.PATCH-beta.N`
+     - Mark as prerelease in GitHub
+     - Include testing instructions and warnings
+   - **Main branch** → Create a full release (e.g., v2.5.0)
+     - Use standard semantic versioning: `MAJOR.MINOR.PATCH`
+     - Not marked as prerelease (production-ready)
+     - Should follow successful beta testing
+
+7. **Beta Release Guidelines**
    - Mark as prerelease: `gh release edit vX.Y.Z-beta.N --prerelease`
    - Include clear testing instructions
    - Warn users this is for testing purposes
-   - If the current branch is a feature branch assume that a Beta Release is being created
+   - Request feedback on specific features being tested
 
 ## Testing
 
