@@ -143,6 +143,15 @@ Covers that only support OPEN and CLOSE commands (no position control) are suppo
 - Garage doors with open/close only
 - Budget blinds without position feedback
 
+**Inverse State with Open/Close-Only Covers:**
+
+The "Inverse the state" option works with open/close-only covers by inverting the calculated position **before** comparing to the threshold:
+
+- Without inverse: Position 30% → 30% < 50% → CLOSE command
+- With inverse: Position 30% → inverted to 70% → 70% ≥ 50% → OPEN command
+
+This allows the integration to support covers with non-standard OPEN/CLOSE behavior that don't follow Home Assistant guidelines. Enable this option if your cover's OPEN and CLOSE commands appear to work backwards.
+
 ## Installation
 
 ### HACS (Recommended)

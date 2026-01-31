@@ -104,6 +104,59 @@ Each platform file registers entities with Home Assistant:
   - Summer strategy: Close fully when hot
   - Intermediate: Use calculated position with weather awareness
 
+## Inverse State Behavior
+
+### CRITICAL: Do Not Change This Behavior
+
+The `inverse_state` feature is designed to handle covers that don't follow Home Assistant guidelines (where 0=closed, 100=open). When enabled, it inverts the calculated position for both position-capable AND open/close-only covers.
+
+### How Inverse State Works
+
+**For Position-Capable Covers:**
+- Calculated position is inverted: `state = 100 - state`
+- Inverted position is sent to the cover entity
+- Example: Calculate 30% → invert to 70% → send position 70 to cover
+
+**For Open/Close-Only Covers:**
+- Calculated position is inverted: `state = 100 - state`
+- Inverted position is compared to threshold
+- Example: Calculate 30% → invert to 70% → 70% ≥ 50% → send OPEN command
+
+### Code Flow (coordinator.py)
+
+1. **Line 822-824**: Inverse state is applied if enabled and interpolation is NOT used
+   ```python
+   if self._inverse_state and not self._use_interpolation:
+       state = inverse_state(state)
+   ```
+
+2. **Line 497-502**: For open/close-only covers, threshold is applied to the (potentially inverted) state
+   ```python
+   if state >= self._open_close_threshold:
+       service = "open_cover"
+   else:
+       service = "close_cover"
+   ```
+
+### Why This Order Is Correct
+
+The inversion happens BEFORE the threshold check for open/close-only covers. This is intentional because:
+- It allows `inverse_state` to work consistently for both cover types
+- Covers with inverted semantics need inverted behavior at the command level, not just position level
+- The threshold operates on the "inverted world" where the cover's semantics are backwards
+
+### Development Rules
+
+**NEVER:**
+- Change the order of inverse_state application and threshold checking
+- Skip inverse_state for open/close-only covers when it's enabled
+- Apply inverse_state after the threshold check
+
+**ALWAYS:**
+- Preserve the current flow: calculate → invert (if enabled) → threshold (for open/close-only)
+- Test both position-capable and open/close-only covers when modifying state calculation
+- Refer to this section when working on coordinator state calculation logic
+
 ## Configuration Structure
 
 Config is stored in two layers:
