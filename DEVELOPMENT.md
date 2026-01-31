@@ -315,6 +315,12 @@ Edit this file to create the test scenarios you need.
 
 This integration uses pytest for automated testing.
 
+**For comprehensive test documentation, see [UNIT_TESTS.md](UNIT_TESTS.md)** which includes:
+- Detailed test descriptions for all 172 tests
+- Fixture documentation with usage examples
+- Testing patterns and best practices
+- Coverage goals and future expansion plans
+
 #### Running Tests Locally
 
 ```bash
@@ -347,22 +353,32 @@ pytest -v
 
 #### Test Structure
 
-- `tests/conftest.py` - Shared fixtures (hass mock, logger, configs)
-- `tests/test_calculation.py` - Position calculation tests (25 tests, unit)
-- `tests/test_helpers.py` - Helper function tests (30 tests, unit)
-- `tests/test_inverse_state.py` - Critical inverse state tests (13 tests, unit)
+- `tests/conftest.py` - Shared fixtures (hass mock, logger, configs, cover instances)
+- `tests/test_calculation.py` - Position calculation tests (129 tests, unit)
+  - Phase 1: AdaptiveGeneralCover properties (40 tests)
+  - Phase 2: Cover type classes (50 tests)
+  - Phase 3: NormalCoverState logic (20 tests)
+  - Phase 4: ClimateCoverData properties (40 tests)
+  - Phase 5: ClimateCoverState logic (50 tests)
+- `tests/test_helpers.py` - Helper function tests (29 tests, unit)
+- `tests/test_inverse_state.py` - Critical inverse state tests (14 tests, unit)
 
-**Total: 68 tests**
+**Total: 172 tests** (all passing)
 
 #### Test Coverage
 
-Current test coverage focuses on core functionality:
+Current test coverage status:
 
-- **helpers.py**: 100% coverage - All utility functions tested
-- **const.py**: 100% coverage - Constants validated
-- **calculation.py**: 31% coverage - Key algorithms tested
-- **coordinator.py**: 22% coverage - Critical paths tested
-- **Overall**: 20% coverage
+| Module | Coverage | Tests | Status |
+|--------|----------|-------|--------|
+| **calculation.py** | 91% | 129 | ✅ Comprehensive |
+| **helpers.py** | 100% | 29 | ✅ Complete |
+| **const.py** | 100% | - | ✅ Complete |
+| **inverse_state** | 100% | 14 | ✅ Complete |
+| **coordinator.py** | 22% | - | 🔄 Future work |
+| **Overall** | 30% | 172 | 🔄 In progress |
+
+See [UNIT_TESTS.md](UNIT_TESTS.md) for detailed coverage information and future expansion plans.
 
 #### Writing Tests
 

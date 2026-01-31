@@ -114,6 +114,48 @@ See [UNIT_TESTS.md](UNIT_TESTS.md) for:
 - Testing patterns and best practices
 - Coverage goals and future expansion plans
 
+### When to Add Tests
+
+**CRITICAL: Always add or update tests when making code changes.**
+
+**Add new tests when:**
+- Adding new features or functionality
+- Adding new classes, methods, or functions
+- Adding new cover types or operation modes
+- Implementing new calculation logic
+- Adding climate mode features
+- Modifying entity handling
+
+**Update existing tests when:**
+- Changing calculation algorithms or formulas
+- Modifying state determination logic
+- Changing default behaviors
+- Updating method signatures
+- Fixing bugs (add regression test)
+
+**Testing checklist:**
+1. ✅ Write tests for new code before committing
+2. ✅ Ensure all tests pass locally: `pytest tests/ -v`
+3. ✅ Check coverage: `pytest tests/ --cov --cov-report=term`
+4. ✅ Aim for 90%+ coverage for calculation logic
+5. ✅ Update UNIT_TESTS.md if adding new test categories
+6. ✅ Follow existing patterns in test_calculation.py
+
+**Example workflow:**
+```bash
+# 1. Make code changes
+# 2. Add/update tests
+# 3. Run tests
+pytest tests/ -v
+
+# 4. Check coverage
+pytest tests/test_calculation.py --cov=custom_components/adaptive_cover_pro/calculation.py --cov-report=term
+
+# 5. Commit code and tests together
+git add custom_components/adaptive_cover_pro/calculation.py tests/test_calculation.py
+git commit -m "feat: Add new feature with tests"
+```
+
 ## Architecture
 
 This integration follows Home Assistant's **Data Coordinator Pattern**:
@@ -258,6 +300,11 @@ Config is stored in two layers:
 - ALWAYS create a git feature branch before making changes
 - Keep commits atomic and focused
 - Never refactor code unless explicitly asked
+- **ALWAYS add or update tests when adding features or changing logic**
+  - New features require new tests covering the functionality
+  - Logic changes require updating existing tests to match new behavior
+  - Aim for 90%+ coverage for core calculation logic
+  - See [UNIT_TESTS.md](UNIT_TESTS.md) for testing patterns and best practices
 
 ## Feature Planning
 
