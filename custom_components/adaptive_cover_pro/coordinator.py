@@ -167,6 +167,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.first_refresh = False
         self.timed_refresh = False
         self.climate_state = None
+        self.climate_data = None  # Store climate_data for P1 diagnostics
         self.control_method = "intermediate"
         self.state_change_data: StateChangedData | None = None
         self.manager = AdaptiveCoverManager(self.hass, self.manual_duration, self.logger)
@@ -776,6 +777,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         climate = ClimateCoverData(*self.get_climate_data(options))
         self.climate_state = round(ClimateCoverState(cover_data, climate).get_state())
         climate_data = ClimateCoverState(cover_data, climate).climate_data
+        self.climate_data = climate_data  # Store for P1 diagnostics
         if climate_data.is_summer and self.switch_mode:
             self.control_method = "summer"
         if climate_data.is_winter and self.switch_mode:
@@ -846,11 +848,27 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 "in_blind_spot": getattr(cover, "in_blind_spot", None),
             }
 
-        # Climate data if enabled
-        if self._climate_mode and self.climate_state is not None:
+        # Climate data if enabled (P1 diagnostics)
+        if self._climate_mode and self.climate_data is not None:
             diagnostics["climate_control_method"] = self.control_method
-            # Access climate data through ClimateCoverState if available
-            # This will be populated when climate mode is active
+
+            # Active temperature and temperature details
+            diagnostics["active_temperature"] = self.climate_data.get_current_temperature
+            diagnostics["temperature_details"] = {
+                "inside_temperature": self.climate_data.inside_temperature,
+                "outside_temperature": self.climate_data.outside_temperature,
+                "temp_switch": self.climate_data.temp_switch,
+            }
+
+            # Climate conditions
+            diagnostics["climate_conditions"] = {
+                "is_summer": self.climate_data.is_summer,
+                "is_winter": self.climate_data.is_winter,
+                "is_presence": self.climate_data.is_presence,
+                "is_sunny": self.climate_data.is_sunny,
+                "lux_active": self.climate_data.lux if self.climate_data._use_lux else None,
+                "irradiance_active": self.climate_data.irradiance if self.climate_data._use_irradiance else None,
+            }
 
         return diagnostics
 

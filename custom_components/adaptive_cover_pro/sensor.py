@@ -19,6 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CONF_CLIMATE_MODE,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_SENSOR_TYPE,
     DOMAIN,
@@ -145,6 +146,68 @@ async def async_setup_entry(
                 PERCENTAGE,
                 "mdi:calculator",
                 SensorStateClass.MEASUREMENT,
+            )
+        )
+
+        # P1: Advanced diagnostic sensors (disabled by default)
+        # Only add climate-specific sensors if climate mode is enabled
+        if config_entry.options.get(CONF_CLIMATE_MODE, False):
+            # Active Temperature sensor
+            entities.append(
+                AdaptiveCoverAdvancedDiagnosticSensor(
+                    config_entry.entry_id,
+                    hass,
+                    config_entry,
+                    name,
+                    coordinator,
+                    "Active Temperature",
+                    "active_temperature",
+                    None,  # Unit will be determined by HA
+                    "mdi:thermometer",
+                    SensorStateClass.MEASUREMENT,
+                    SensorDeviceClass.TEMPERATURE,
+                )
+            )
+
+            # Climate Conditions sensor
+            entities.append(
+                AdaptiveCoverAdvancedDiagnosticEnumSensor(
+                    config_entry.entry_id,
+                    hass,
+                    config_entry,
+                    name,
+                    coordinator,
+                    "Climate Conditions",
+                    "climate_conditions",
+                    "mdi:weather-partly-cloudy",
+                )
+            )
+
+        # Time Window Status sensor (always created if diagnostics enabled)
+        entities.append(
+            AdaptiveCoverAdvancedDiagnosticEnumSensor(
+                config_entry.entry_id,
+                hass,
+                config_entry,
+                name,
+                coordinator,
+                "Time Window Status",
+                "time_window",
+                "mdi:clock-check-outline",
+            )
+        )
+
+        # Sun Validity Status sensor (always created if diagnostics enabled)
+        entities.append(
+            AdaptiveCoverAdvancedDiagnosticEnumSensor(
+                config_entry.entry_id,
+                hass,
+                config_entry,
+                name,
+                coordinator,
+                "Sun Validity Status",
+                "sun_validity",
+                "mdi:weather-sunny-alert",
             )
         )
 
@@ -493,3 +556,86 @@ class AdaptiveCoverDiagnosticEnumSensor(
             identifiers={(DOMAIN, self._device_id)},
             name=self._name,
         )
+
+
+class AdaptiveCoverAdvancedDiagnosticSensor(AdaptiveCoverDiagnosticSensor):
+    """Advanced diagnostic sensor (P1 - disabled by default)."""
+
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        unique_id: str,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        name: str,
+        coordinator: AdaptiveDataUpdateCoordinator,
+        sensor_name: str,
+        diagnostic_key: str,
+        unit: str | None,
+        icon: str,
+        state_class: SensorStateClass | None = None,
+        device_class: SensorDeviceClass | None = None,
+    ) -> None:
+        """Initialize advanced diagnostic sensor."""
+        super().__init__(
+            unique_id, hass, config_entry, name, coordinator,
+            sensor_name, diagnostic_key, unit, icon, state_class
+        )
+        if device_class:
+            self._attr_device_class = device_class
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        """Return additional state attributes."""
+        if self.data.diagnostics is None:
+            return None
+
+        # For temperature sensor, add temperature details
+        if self._diagnostic_key == "active_temperature":
+            return self.data.diagnostics.get("temperature_details")
+
+        return None
+
+
+class AdaptiveCoverAdvancedDiagnosticEnumSensor(AdaptiveCoverDiagnosticEnumSensor):
+    """Advanced diagnostic enum sensor (P1 - disabled by default)."""
+
+    _attr_entity_registry_enabled_default = False
+
+    @property
+    def native_value(self) -> str | None:
+        """Return computed state from dict data."""
+        if self.data.diagnostics is None:
+            return None
+
+        data = self.data.diagnostics.get(self._diagnostic_key)
+        if data is None:
+            return None
+
+        # Compute human-readable state from dict
+        if self._diagnostic_key == "time_window":
+            return "Active" if data.get("check_adaptive_time") else "Outside Window"
+        elif self._diagnostic_key == "sun_validity":
+            if not data.get("valid"):
+                if data.get("in_blind_spot"):
+                    return "In Blind Spot"
+                elif not data.get("valid_elevation"):
+                    return "Invalid Elevation"
+                return "Invalid"
+            return "Valid"
+        elif self._diagnostic_key == "climate_conditions":
+            if data.get("is_summer"):
+                return "Summer Mode"
+            elif data.get("is_winter"):
+                return "Winter Mode"
+            return "Intermediate"
+
+        return str(data)
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        """Return dict data as attributes."""
+        if self.data.diagnostics is None:
+            return None
+        return self.data.diagnostics.get(self._diagnostic_key)
