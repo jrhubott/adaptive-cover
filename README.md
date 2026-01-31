@@ -83,6 +83,7 @@ This fork includes enhancements and modifications, but the core functionality an
     - Sun position (azimuth, elevation, gamma)
     - Control status (why covers aren't moving)
     - Calculated position (before adjustments)
+    - Last cover action (tracks most recent cover action with full details)
   - Priority 1 sensors (disabled by default, enable individually):
     - Active temperature (climate mode only)
     - Climate conditions (climate mode only)
@@ -491,6 +492,7 @@ These sensors are created when diagnostics are enabled in automation settings. T
 | `sensor.{device_name}_gamma` | Enabled | Surface solar azimuth - sun angle relative to window (most critical for troubleshooting). |
 | `sensor.{device_name}_control_status` | Enabled | Shows why covers aren't moving: `active`, `outside_time_window`, `manual_override`, `automatic_control_off`, `sun_not_visible`, etc. |
 | `sensor.{device_name}_calculated_position` | Enabled | Raw calculated position before interpolation/inversion adjustments. |
+| `sensor.{device_name}_last_cover_action` | Enabled | Tracks the most recent cover action: service called, entity controlled, timestamp. Attributes include position sent, threshold used (for open/close-only covers), and whether inverse_state was applied. Useful for debugging. |
 | `sensor.{device_name}_active_temperature` | Disabled | Currently active temperature value (climate mode only). Shows which sensor is used. Enable manually if needed. |
 | `sensor.{device_name}_climate_conditions` | Disabled | Climate mode state (Summer Mode, Winter Mode, Intermediate) with condition flags as attributes (climate mode only). Enable manually if needed. |
 | `sensor.{device_name}_time_window` | Disabled | Time window status (Active/Outside Window) with time details as attributes. Enable manually if needed. |
