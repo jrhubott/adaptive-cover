@@ -281,6 +281,51 @@ When creating releases, follow these guidelines:
    - Warn users this is for testing purposes
    - Request feedback on specific features being tested
 
+## Documentation Guidelines
+
+### README.md Updates
+
+**CRITICAL:** Always update README.md when adding new features or making user-visible changes.
+
+**Required Updates:**
+1. **Features Section** (~line 52-91)
+   - Add bullet points describing the new feature
+   - Include key capabilities and options
+   - Mention any configuration requirements
+
+2. **Entities Section** (~line 447-495)
+   - Add new entities to the appropriate table
+   - Include entity name pattern, default state, and description
+   - Mark optional/conditional entities clearly
+   - Note any special behavior (disabled by default, climate mode only, etc.)
+
+3. **Variables Section** (if adding config options)
+   - Document new configuration variables
+   - Include default values and valid ranges
+   - Explain what the option controls
+
+4. **Known Limitations** (if applicable)
+   - Document any limitations or edge cases
+   - Provide workarounds if available
+
+**Example Workflow:**
+```bash
+# 1. Make code changes
+# 2. Update README.md
+# 3. Commit both together
+git add custom_components/adaptive_cover_pro/ README.md
+git commit -m "feat: Add feature X
+
+- Implementation details
+- README updated with feature documentation"
+```
+
+**Quality Check:**
+- Use clear, user-friendly language
+- Include examples where helpful
+- Keep table formatting consistent
+- Verify markdown renders correctly
+
 ## Testing
 
 ### Manual Testing
