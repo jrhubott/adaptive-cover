@@ -354,6 +354,8 @@ When creating releases, follow these guidelines:
 3. **Release Notes**
    - **NEVER** include `Co-Authored-By:` lines in release notes
    - **NEVER** include Claude/AI attributions (e.g., "Generated with Claude Code")
+   - **ALWAYS** generate notes in `/tmp/release_notes.md` and use `--notes` parameter
+   - **NEVER** use `--editor` parameter (avoids interactive editor)
    - Use clear, user-friendly language with emoji section headers
    - Include: Features, Documentation, Technical Details, Installation, Testing sections
    - For beta releases, mark as prerelease and include testing guidance
@@ -371,11 +373,34 @@ When creating releases, follow these guidelines:
 
    **Automated (Recommended):**
    ```bash
-   # Use the release script for automated releases
-   ./scripts/release beta --editor         # Create beta release with editor
-   ./scripts/release patch --editor        # Create patch release with editor
-   ./scripts/release --help               # See all options
+   # Generate release notes in tmp directory
+   cat > /tmp/release_notes.md << 'EOF'
+   ## 🎯 Release Title
+
+   Release description here...
+
+   ### ✨ Features
+   - Feature 1
+   - Feature 2
+
+   ### 📚 Documentation
+   - Doc update 1
+
+   ### 🧪 Testing
+   - Tested with Python 3.11 and 3.12
+   - Home Assistant 2024.5.0+
+   EOF
+
+   # Pass notes file to release script (NEVER use --editor)
+   ./scripts/release patch --notes /tmp/release_notes.md --yes
+   ./scripts/release beta --notes /tmp/release_notes.md --yes
+
+   # For help with all options
+   ./scripts/release --help
    ```
+
+   **IMPORTANT:** Always generate notes in `/tmp/release_notes.md` and use `--notes` parameter.
+   Do NOT use `--editor` parameter as it opens an interactive editor.
 
    **Manual (Fallback):**
    ```bash
