@@ -59,6 +59,61 @@ The release script automates the entire release process:
 - Verifies ZIP asset creation
 - Supports both beta and production releases
 
+## Testing
+
+**For comprehensive testing documentation, see [UNIT_TESTS.md](UNIT_TESTS.md)**
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run specific test file
+pytest tests/test_calculation.py -v
+
+# Run with coverage
+pytest tests/ --cov=custom_components/adaptive_cover_pro --cov-report=term
+
+# Run in virtual environment
+source venv/bin/activate && pytest tests/ -v
+```
+
+### Test Coverage
+
+Current test coverage status:
+
+| Module | Coverage | Tests | Status |
+|--------|----------|-------|--------|
+| calculation.py | 91% | 129 | ✅ Comprehensive |
+| helpers.py | 100% | 29 | ✅ Complete |
+| inverse_state behavior | 100% | 14 | ✅ Complete |
+| **Total** | **30%** | **172** | 🔄 In progress |
+
+**Test Organization:**
+- `tests/test_calculation.py` - Position calculation logic (129 tests)
+  - Phase 1: AdaptiveGeneralCover properties (40 tests)
+  - Phase 2: Cover type classes - Vertical, Horizontal, Tilt (50 tests)
+  - Phase 3: NormalCoverState logic (20 tests)
+  - Phase 4: ClimateCoverData properties (40 tests)
+  - Phase 5: ClimateCoverState logic (50 tests)
+- `tests/test_helpers.py` - Helper utility functions (29 tests)
+- `tests/test_inverse_state.py` - Inverse state behavior (14 tests)
+- `tests/conftest.py` - Shared fixtures and configuration
+
+**Key Testing Features:**
+- Comprehensive fixtures for cover instances
+- Datetime mocking for time-dependent tests
+- Entity state mocking for Home Assistant integration
+- Edge case handling (NaN, ValueError, boundary conditions)
+- 100% coverage of critical business logic
+
+See [UNIT_TESTS.md](UNIT_TESTS.md) for:
+- Detailed test descriptions
+- Fixture documentation
+- Testing patterns and best practices
+- Coverage goals and future expansion plans
+
 ## Architecture
 
 This integration follows Home Assistant's **Data Coordinator Pattern**:
@@ -436,7 +491,9 @@ git commit -m "feat: Add new development script
   - All command-line options are documented
   - CI/CD integration examples work correctly
 
-## Testing
+## Manual Testing & Simulation
+
+**For unit test documentation, see [UNIT_TESTS.md](UNIT_TESTS.md)**
 
 ### Manual Testing
 - Use `./scripts/develop` to start test instance
@@ -478,11 +535,17 @@ adaptive-cover/
 │   ├── develop                  # Start Home Assistant dev server
 │   ├── lint                     # Run linting
 │   └── release                  # Create releases (automated)
+├── tests/                       # Unit tests
+│   ├── conftest.py              # Shared fixtures and configuration
+│   ├── test_calculation.py      # Calculation logic tests (129 tests, 91% coverage)
+│   ├── test_helpers.py          # Helper function tests (29 tests, 100% coverage)
+│   └── test_inverse_state.py    # Inverse state tests (14 tests, 100% coverage)
 ├── config/                      # Test Home Assistant config
 ├── notebooks/                   # Jupyter notebooks for testing
 ├── .github/workflows/           # GitHub Actions
 │   └── publish-release.yml      # Automated release workflow
 ├── DEVELOPMENT.md               # Developer documentation (comprehensive)
+├── UNIT_TESTS.md                # Unit test documentation (test structure, patterns, coverage)
 ├── CLAUDE.md                    # Instructions for Claude Code (this file)
 ├── README.md                    # User documentation
 └── pyproject.toml               # Python project configuration
