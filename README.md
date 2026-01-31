@@ -77,6 +77,20 @@ This fork includes enhancements and modifications, but the core functionality an
   - Set minimum interval time between position changes
   - set minimum percentage change
 
+- **Diagnostic Sensors** (Optional, disabled by default)
+  - Real-time troubleshooting sensors to understand integration behavior
+  - Priority 0 sensors (enabled by default when diagnostics enabled):
+    - Sun position (azimuth, elevation, gamma)
+    - Control status (why covers aren't moving)
+    - Calculated position (before adjustments)
+  - Priority 1 sensors (disabled by default, enable individually):
+    - Active temperature (climate mode only)
+    - Climate conditions (climate mode only)
+    - Time window status
+    - Sun validity status
+  - Enable in automation settings
+  - All sensors use diagnostic entity category
+
 ## Known Limitations & Best Practices
 
 ### Temperature Unit Consistency
@@ -465,6 +479,24 @@ When climate mode is setup you will also get these entities:
 | ------------------------------------------ | ------- | ----------------------------------------------------------------------------------------------------------- |
 | `switch.{device_name}_climate_mode`        | `on`    | Enables climate mode strategy; otherwise, defaults to the standard strategy.                                |
 | `switch.{device_name}_outside_temperature` | `on`    | Switches between inside and outside temperatures as the basis for determining the climate control strategy. |
+
+**Diagnostic Sensors (Optional):**
+
+These sensors are created when diagnostics are enabled in automation settings. They help troubleshoot and monitor integration behavior.
+
+| Entity | Default | Description |
+| ------ | ------- | ----------- |
+| `sensor.{device_name}_sun_azimuth` | Enabled | Current sun azimuth angle in degrees (0-360°). Verify window azimuth configuration. |
+| `sensor.{device_name}_sun_elevation` | Enabled | Current sun elevation angle in degrees. Debug elevation constraints and blind spots. |
+| `sensor.{device_name}_gamma` | Enabled | Surface solar azimuth - sun angle relative to window (most critical for troubleshooting). |
+| `sensor.{device_name}_control_status` | Enabled | Shows why covers aren't moving: `active`, `outside_time_window`, `manual_override`, `automatic_control_off`, `sun_not_visible`, etc. |
+| `sensor.{device_name}_calculated_position` | Enabled | Raw calculated position before interpolation/inversion adjustments. |
+| `sensor.{device_name}_active_temperature` | Disabled | Currently active temperature value (climate mode only). Shows which sensor is used. Enable manually if needed. |
+| `sensor.{device_name}_climate_conditions` | Disabled | Climate mode state (Summer Mode, Winter Mode, Intermediate) with condition flags as attributes (climate mode only). Enable manually if needed. |
+| `sensor.{device_name}_time_window` | Disabled | Time window status (Active/Outside Window) with time details as attributes. Enable manually if needed. |
+| `sensor.{device_name}_sun_validity` | Disabled | Sun validity status (Valid, In Blind Spot, Invalid Elevation) with validation details as attributes. Enable manually if needed. |
+
+**Note:** Priority 1 sensors (last 4) are created disabled by default to reduce entity overhead. Enable them individually in the entity list if needed for troubleshooting.
 
 ![entities](https://github.com/jrhubott/adaptive-cover/blob/main/images/entities.png)
 
