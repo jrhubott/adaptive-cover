@@ -41,6 +41,22 @@ Pre-commit hooks run automatically on commit:
 - Prettier for YAML/JSON
 - Trailing whitespace cleanup
 
+### Release
+```bash
+./scripts/release              # Create a release (interactive)
+./scripts/release beta         # Create beta release (auto-increment)
+./scripts/release patch        # Create patch release (X.Y.Z+1)
+./scripts/release --help       # See all options
+```
+
+The release script automates the entire release process:
+- Updates version in manifest.json
+- Creates git commit and annotated tag
+- Pushes to GitHub and triggers automated workflow
+- Edits GitHub release with proper notes
+- Verifies ZIP asset creation
+- Supports both beta and production releases
+
 ## Architecture
 
 This integration follows Home Assistant's **Data Coordinator Pattern**:
@@ -247,6 +263,16 @@ When creating releases, follow these guidelines:
    - If the ZIP is missing, the workflow may have failed - check GitHub Actions logs
 
 5. **Release Creation Steps**
+
+   **Automated (Recommended):**
+   ```bash
+   # Use the release script for automated releases
+   ./scripts/release beta --editor         # Create beta release with editor
+   ./scripts/release patch --editor        # Create patch release with editor
+   ./scripts/release --help               # See all options
+   ```
+
+   **Manual (Fallback):**
    ```bash
    # 1. Update version in manifest.json
    # 2. Commit the version bump

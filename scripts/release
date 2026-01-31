@@ -1,0 +1,1050 @@
+#!/usr/bin/env bash
+#
+# Release automation script for Adaptive Cover Pro
+#
+# Creates releases or beta releases with proper version management,
+# git tagging, and GitHub release creation.
+#
+# Usage:
+#   ./scripts/release                    Interactive mode
+#   ./scripts/release beta               Auto-increment beta version
+#   ./scripts/release patch              Increment patch version
+#   ./scripts/release minor              Increment minor version
+#   ./scripts/release major              Increment major version
+#   ./scripts/release 2.5.1-beta.7       Explicit version
+#   ./scripts/release beta --dry-run     Preview without executing
+#   ./scripts/release patch --editor     Use editor for release notes
+#
+
+set -e
+
+# Navigate to repository root
+cd "$(dirname "$0")/.."
+
+# ============================================================================
+# Configuration
+# ============================================================================
+
+MANIFEST_FILE="custom_components/adaptive_cover_pro/manifest.json"
+WORKFLOW_TIMEOUT=60
+WORKFLOW_POLL_INTERVAL=5
+RETRY_ATTEMPTS=3
+RETRY_DELAY=5
+
+# ============================================================================
+# Colors and Formatting
+# ============================================================================
+
+if [[ -t 1 ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    MAGENTA='\033[0;35m'
+    CYAN='\033[0;36m'
+    BOLD='\033[1m'
+    RESET='\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    MAGENTA=''
+    CYAN=''
+    BOLD=''
+    RESET=''
+fi
+
+# ============================================================================
+# Global Variables
+# ============================================================================
+
+DRY_RUN=false
+AUTO_YES=false
+USE_EDITOR=false
+NOTES_FILE=""
+AUTO_NOTES=false
+FORCE_BRANCH=false
+VERSION_SPEC=""
+NEW_VERSION=""
+CURRENT_VERSION=""
+RELEASE_TYPE=""
+PRERELEASE_FLAG=""
+CREATED_TAG=""
+CREATED_COMMIT=""
+
+# ============================================================================
+# Logging Functions
+# ============================================================================
+
+log_info() {
+    echo -e "${BLUE}ℹ${RESET} $*"
+}
+
+log_success() {
+    echo -e "${GREEN}✓${RESET} $*"
+}
+
+log_warning() {
+    echo -e "${YELLOW}⚠${RESET} $*"
+}
+
+log_error() {
+    echo -e "${RED}✗${RESET} $*" >&2
+}
+
+log_step() {
+    echo -e "${MAGENTA}▸${RESET} ${BOLD}$*${RESET}"
+}
+
+log_dry_run() {
+    echo -e "${CYAN}[DRY RUN]${RESET} $*"
+}
+
+# ============================================================================
+# Help Text
+# ============================================================================
+
+show_help() {
+    cat << 'EOF'
+Release automation script for Adaptive Cover Pro
+
+USAGE:
+    ./scripts/release [VERSION_SPEC] [OPTIONS]
+
+VERSION_SPEC:
+    patch               Increment patch version (X.Y.Z+1)
+    minor               Increment minor version (X.Y+1.0)
+    major               Increment major version (X+1.0.0)
+    beta                Auto-increment beta version
+    X.Y.Z               Explicit version number
+    X.Y.Z-beta.N        Explicit beta version
+
+    If omitted, enters interactive mode.
+
+OPTIONS:
+    --dry-run           Preview operations without executing
+    --yes, -y           Skip confirmation prompts
+    --editor, -e        Open editor for release notes
+    --notes FILE        Read release notes from file
+    --auto-notes        Use auto-generated notes only
+    --force-branch      Skip branch validation
+    --help, -h          Show this help text
+
+EXAMPLES:
+    # Interactive mode
+    ./scripts/release
+
+    # Create beta release (auto-increment)
+    ./scripts/release beta --editor
+
+    # Create patch release
+    ./scripts/release patch --editor
+
+    # Explicit version
+    ./scripts/release 2.5.1-beta.8 --editor
+
+    # Preview without changes
+    ./scripts/release beta --dry-run
+
+    # CI mode (no prompts, auto notes)
+    ./scripts/release beta --yes --auto-notes
+
+RELEASE TYPES:
+    Beta Release:
+        - Created from feature branches
+        - Version format: X.Y.Z-beta.N
+        - Marked as prerelease on GitHub
+        - Includes testing instructions
+
+    Production Release:
+        - Created from main branch
+        - Version format: X.Y.Z
+        - Stable, production-ready
+        - Full release notes
+
+WORKFLOW:
+    1. Validates environment (git, gh, jq)
+    2. Calculates new version
+    3. Updates manifest.json
+    4. Creates git commit and tag
+    5. Pushes to GitHub
+    6. Waits for workflow to complete
+    7. Edits GitHub release with notes
+    8. Verifies ZIP asset exists
+
+REQUIREMENTS:
+    - git (version control)
+    - gh (GitHub CLI, authenticated)
+    - jq (JSON processing)
+
+For more information, see CLAUDE.md section "Release Process"
+EOF
+}
+
+# ============================================================================
+# Error Handling
+# ============================================================================
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+
+    log_error "Script failed at line $line_number with exit code $exit_code"
+
+    if [[ $DRY_RUN == true ]]; then
+        log_info "Dry run mode - no cleanup needed"
+        exit $exit_code
+    fi
+
+    log_step "Attempting rollback..."
+    rollback_changes
+
+    exit $exit_code
+}
+
+trap 'handle_error $? $LINENO' ERR
+
+rollback_changes() {
+    local has_changes=false
+
+    # Delete created tag (local)
+    if [[ -n $CREATED_TAG ]] && git tag -l "$CREATED_TAG" | grep -q "$CREATED_TAG"; then
+        log_info "Deleting local tag: $CREATED_TAG"
+        git tag -d "$CREATED_TAG" || true
+        has_changes=true
+    fi
+
+    # Delete created tag (remote)
+    if [[ -n $CREATED_TAG ]]; then
+        if git ls-remote --tags origin | grep -q "refs/tags/$CREATED_TAG"; then
+            log_info "Deleting remote tag: $CREATED_TAG"
+            git push --delete origin "$CREATED_TAG" 2>/dev/null || true
+            has_changes=true
+        fi
+    fi
+
+    # Reset commit if created
+    if [[ -n $CREATED_COMMIT ]]; then
+        log_info "Resetting commit: $CREATED_COMMIT"
+        git reset --hard HEAD^ || true
+        has_changes=true
+    fi
+
+    if [[ $has_changes == true ]]; then
+        log_success "Rollback completed"
+    else
+        log_info "No changes to rollback"
+    fi
+}
+
+# ============================================================================
+# Utility Functions
+# ============================================================================
+
+is_dry_run() {
+    [[ $DRY_RUN == true ]]
+}
+
+execute() {
+    local cmd="$*"
+
+    if is_dry_run; then
+        log_dry_run "$cmd"
+        return 0
+    fi
+
+    eval "$cmd"
+}
+
+retry_command() {
+    local cmd="$*"
+    local attempt=1
+
+    while [[ $attempt -le $RETRY_ATTEMPTS ]]; do
+        if eval "$cmd"; then
+            return 0
+        fi
+
+        if [[ $attempt -lt $RETRY_ATTEMPTS ]]; then
+            log_warning "Command failed (attempt $attempt/$RETRY_ATTEMPTS), retrying in ${RETRY_DELAY}s..."
+            sleep $RETRY_DELAY
+        fi
+
+        ((attempt++))
+    done
+
+    log_error "Command failed after $RETRY_ATTEMPTS attempts"
+    return 1
+}
+
+confirm() {
+    local prompt="$1"
+    local default="${2:-n}"
+
+    if [[ $AUTO_YES == true ]]; then
+        return 0
+    fi
+
+    local yn
+    if [[ $default == "y" ]]; then
+        read -r -p "$prompt [Y/n] " yn
+        yn=${yn:-y}
+    else
+        read -r -p "$prompt [y/N] " yn
+        yn=${yn:-n}
+    fi
+
+    [[ $yn =~ ^[Yy] ]]
+}
+
+# ============================================================================
+# Validation Functions
+# ============================================================================
+
+validate_environment() {
+    log_step "Validating environment"
+
+    # Check required commands
+    local missing_tools=()
+
+    if ! command -v git &> /dev/null; then
+        missing_tools+=("git")
+    fi
+
+    if ! command -v gh &> /dev/null; then
+        missing_tools+=("gh")
+    fi
+
+    if ! command -v jq &> /dev/null; then
+        missing_tools+=("jq")
+    fi
+
+    if [[ ${#missing_tools[@]} -gt 0 ]]; then
+        log_error "Missing required tools: ${missing_tools[*]}"
+        log_info "Install with: brew install ${missing_tools[*]}"
+        exit 1
+    fi
+
+    log_success "Required tools installed: git, gh, jq"
+
+    # Check gh authentication
+    if ! is_dry_run; then
+        if ! gh auth status &> /dev/null; then
+            log_error "GitHub CLI not authenticated"
+            log_info "Run: gh auth login"
+            exit 1
+        fi
+        log_success "GitHub CLI authenticated"
+    fi
+
+    # Check working directory is clean
+    if [[ -n $(git status --porcelain) ]]; then
+        log_error "Working directory is not clean"
+        log_info "Commit or stash changes before creating a release"
+        git status --short
+        exit 1
+    fi
+    log_success "Working directory clean"
+
+    # Check manifest.json exists
+    if [[ ! -f $MANIFEST_FILE ]]; then
+        log_error "Manifest file not found: $MANIFEST_FILE"
+        exit 1
+    fi
+    log_success "Manifest file exists"
+}
+
+validate_branch() {
+    local current_branch
+    current_branch=$(git branch --show-current)
+
+    log_info "Current branch: $current_branch"
+
+    if [[ $FORCE_BRANCH == true ]]; then
+        log_warning "Branch validation skipped (--force-branch)"
+        return 0
+    fi
+
+    # Determine expected branch based on version
+    if [[ $NEW_VERSION =~ -beta ]]; then
+        # Beta releases from any branch except main (usually)
+        RELEASE_TYPE="beta"
+        PRERELEASE_FLAG="--prerelease"
+
+        if [[ $current_branch == "main" ]]; then
+            log_warning "Creating beta release from main branch (unusual)"
+            if ! confirm "Continue with beta release from main?"; then
+                exit 1
+            fi
+        fi
+    else
+        # Production releases must be from main
+        RELEASE_TYPE="production"
+        PRERELEASE_FLAG=""
+
+        if [[ $current_branch != "main" ]]; then
+            log_error "Production releases must be created from main branch"
+            log_info "Current branch: $current_branch"
+            log_info "Switch to main: git checkout main"
+            log_info "Or use --force-branch to override"
+            exit 1
+        fi
+    fi
+
+    log_success "Branch validation passed: $RELEASE_TYPE release from $current_branch"
+}
+
+validate_version_format() {
+    local version="$1"
+
+    # Semantic versioning regex: X.Y.Z or X.Y.Z-beta.N
+    if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+        log_error "Invalid version format: $version"
+        log_info "Expected: X.Y.Z or X.Y.Z-beta.N"
+        return 1
+    fi
+
+    return 0
+}
+
+check_tag_exists() {
+    local tag="v$NEW_VERSION"
+
+    # Check local tags
+    if git tag -l "$tag" | grep -q "$tag"; then
+        log_error "Tag already exists locally: $tag"
+        return 1
+    fi
+
+    # Check remote tags
+    if ! is_dry_run; then
+        if git ls-remote --tags origin | grep -q "refs/tags/$tag"; then
+            log_error "Tag already exists on remote: $tag"
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+# ============================================================================
+# Version Management Functions
+# ============================================================================
+
+get_current_version() {
+    if [[ ! -f $MANIFEST_FILE ]]; then
+        log_error "Manifest file not found: $MANIFEST_FILE"
+        exit 1
+    fi
+
+    local version
+    version=$(jq -r '.version' "$MANIFEST_FILE")
+
+    if [[ -z $version || $version == "null" ]]; then
+        log_error "Could not read version from $MANIFEST_FILE"
+        exit 1
+    fi
+
+    echo "$version"
+}
+
+parse_version() {
+    local version="$1"
+
+    # Extract components
+    if [[ $version =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-beta\.([0-9]+))?$ ]]; then
+        local major="${BASH_REMATCH[1]}"
+        local minor="${BASH_REMATCH[2]}"
+        local patch="${BASH_REMATCH[3]}"
+        local beta="${BASH_REMATCH[5]}"
+
+        echo "$major $minor $patch $beta"
+    else
+        echo ""
+    fi
+}
+
+calculate_new_version() {
+    local spec="$1"
+    local current="$2"
+
+    # Parse current version
+    read -r major minor patch beta <<< "$(parse_version "$current")"
+
+    if [[ -z $major ]]; then
+        log_error "Could not parse current version: $current"
+        exit 1
+    fi
+
+    local new_version=""
+
+    case "$spec" in
+        patch)
+            new_version="$major.$minor.$((patch + 1))"
+            ;;
+        minor)
+            new_version="$major.$((minor + 1)).0"
+            ;;
+        major)
+            new_version="$((major + 1)).0.0"
+            ;;
+        beta)
+            if [[ -n $beta ]]; then
+                # Increment existing beta
+                new_version="$major.$minor.$patch-beta.$((beta + 1))"
+            else
+                # Create first beta for next patch
+                new_version="$major.$minor.$((patch + 1))-beta.1"
+            fi
+            ;;
+        *)
+            # Explicit version
+            if validate_version_format "$spec"; then
+                new_version="$spec"
+            else
+                exit 1
+            fi
+            ;;
+    esac
+
+    echo "$new_version"
+}
+
+update_manifest_version() {
+    local new_version="$1"
+
+    log_step "Updating manifest.json to version $new_version"
+
+    if is_dry_run; then
+        log_dry_run "jq '.version = \"$new_version\"' $MANIFEST_FILE > ${MANIFEST_FILE}.tmp"
+        log_dry_run "mv ${MANIFEST_FILE}.tmp $MANIFEST_FILE"
+        return 0
+    fi
+
+    # Update version using jq (preserves formatting)
+    local tmp_file="${MANIFEST_FILE}.tmp"
+    jq --arg version "$new_version" '.version = $version' "$MANIFEST_FILE" > "$tmp_file"
+    mv "$tmp_file" "$MANIFEST_FILE"
+
+    log_success "Updated $MANIFEST_FILE to version $new_version"
+}
+
+# ============================================================================
+# Git Operations
+# ============================================================================
+
+create_version_commit() {
+    local version="$1"
+    local commit_msg="chore: Bump version to v$version"
+
+    log_step "Creating version commit"
+
+    execute "git add $MANIFEST_FILE"
+    execute "git commit -m \"$commit_msg\""
+
+    if ! is_dry_run; then
+        CREATED_COMMIT=$(git rev-parse HEAD)
+    fi
+
+    log_success "Created commit: $commit_msg"
+}
+
+create_annotated_tag() {
+    local version="$1"
+    local notes="$2"
+    local tag="v$version"
+
+    log_step "Creating annotated tag: $tag"
+
+    # Create temporary file for tag message
+    local tag_msg_file
+    tag_msg_file=$(mktemp)
+    echo "$notes" > "$tag_msg_file"
+
+    execute "git tag -a \"$tag\" -F \"$tag_msg_file\""
+
+    rm -f "$tag_msg_file"
+
+    if ! is_dry_run; then
+        CREATED_TAG="$tag"
+    fi
+
+    log_success "Created tag: $tag"
+}
+
+push_commit_and_tag() {
+    local version="$1"
+    local tag="v$version"
+    local current_branch
+    current_branch=$(git branch --show-current)
+
+    log_step "Pushing commit and tag to origin"
+
+    # Push commit
+    log_info "Pushing commit to $current_branch..."
+    retry_command "git push origin \"$current_branch\""
+    log_success "Pushed commit"
+
+    # Push tag
+    log_info "Pushing tag $tag..."
+    retry_command "git push origin \"$tag\""
+    log_success "Pushed tag"
+
+    log_info "GitHub Actions workflow will now build the release"
+}
+
+# ============================================================================
+# Release Notes Functions
+# ============================================================================
+
+generate_template() {
+    local version="$1"
+    local release_type="$2"
+
+    if [[ $release_type == "beta" ]]; then
+        cat << EOF
+# Beta Release v$version
+
+**⚠️ BETA RELEASE** - This is a beta version for testing purposes.
+
+## Changes
+- Feature: [Describe new feature]
+- Bug fix: [Describe fix]
+- Enhancement: [Describe improvement]
+
+## Testing Instructions
+1. Install v$version from the release assets below
+2. Test the following scenarios:
+   - [Specific test case 1]
+   - [Specific test case 2]
+3. Report any issues at: https://github.com/jrhubott/adaptive-cover/issues
+
+## Installation
+Download \`adaptive_cover_pro.zip\` from the assets below and extract to your \`custom_components\` directory.
+
+## Known Issues
+- [List any known issues or limitations]
+
+## Next Steps
+If testing is successful, a production release will follow.
+
+---
+🤖 Generated with Claude Code
+EOF
+    else
+        cat << EOF
+# Adaptive Cover Pro v$version
+
+## What's New
+- [Feature highlight 1]
+- [Feature highlight 2]
+
+## Bug Fixes
+- [Bug fix 1]
+- [Bug fix 2]
+
+## Enhancements
+- [Enhancement 1]
+- [Enhancement 2]
+
+## Breaking Changes
+None
+
+## Installation
+
+### HACS
+Update through HACS interface.
+
+### Manual Installation
+Download \`adaptive_cover_pro.zip\` from the assets below and extract to your \`custom_components\` directory.
+
+## Documentation
+Full documentation: https://github.com/jrhubott/adaptive-cover
+
+## Changelog
+See commit history for detailed changes.
+
+---
+🤖 Generated with Claude Code
+EOF
+    fi
+}
+
+filter_coauthored_lines() {
+    local text="$1"
+
+    # Remove Co-Authored-By lines per CLAUDE.md requirements
+    echo "$text" | grep -v "Co-Authored-By:" || true
+}
+
+open_editor_for_notes() {
+    local version="$1"
+    local release_type="$2"
+
+    # Generate template
+    local template
+    template=$(generate_template "$version" "$release_type")
+
+    # Create temporary file
+    local notes_file
+    notes_file=$(mktemp)
+    echo "$template" > "$notes_file"
+
+    # Open editor
+    local editor="${EDITOR:-vi}"
+
+    log_info "Opening $editor for release notes..."
+    log_info "Edit the release notes, save, and close the editor"
+
+    "$editor" "$notes_file"
+
+    # Read edited notes
+    local notes
+    notes=$(cat "$notes_file")
+    rm -f "$notes_file"
+
+    # Filter Co-Authored-By lines
+    notes=$(filter_coauthored_lines "$notes")
+
+    echo "$notes"
+}
+
+get_release_notes() {
+    local version="$1"
+    local release_type="$2"
+
+    if [[ $AUTO_NOTES == true ]]; then
+        log_info "Using auto-generated release notes"
+        generate_template "$version" "$release_type"
+    elif [[ -n $NOTES_FILE ]]; then
+        log_info "Reading release notes from: $NOTES_FILE"
+        if [[ ! -f $NOTES_FILE ]]; then
+            log_error "Notes file not found: $NOTES_FILE"
+            exit 1
+        fi
+        filter_coauthored_lines "$(cat "$NOTES_FILE")"
+    elif [[ $USE_EDITOR == true ]]; then
+        open_editor_for_notes "$version" "$release_type"
+    else
+        # Default: auto-generate
+        log_info "Using auto-generated release notes (use --editor to customize)"
+        generate_template "$version" "$release_type"
+    fi
+}
+
+# ============================================================================
+# GitHub Release Management
+# ============================================================================
+
+wait_for_workflow() {
+    local tag="$1"
+    local elapsed=0
+
+    log_step "Waiting for GitHub Actions workflow to complete"
+
+    if is_dry_run; then
+        log_dry_run "Would wait up to ${WORKFLOW_TIMEOUT}s for workflow"
+        return 0
+    fi
+
+    log_info "Polling every ${WORKFLOW_POLL_INTERVAL}s (timeout: ${WORKFLOW_TIMEOUT}s)..."
+
+    while [[ $elapsed -lt $WORKFLOW_TIMEOUT ]]; do
+        # Check if release exists
+        if gh release view "$tag" &> /dev/null; then
+            log_success "Release created by workflow"
+            return 0
+        fi
+
+        sleep $WORKFLOW_POLL_INTERVAL
+        elapsed=$((elapsed + WORKFLOW_POLL_INTERVAL))
+        echo -n "."
+    done
+
+    echo ""
+    log_error "Workflow did not complete within ${WORKFLOW_TIMEOUT}s"
+    log_info "Check workflow status: gh run list --workflow=publish-release.yml"
+    exit 1
+}
+
+edit_release() {
+    local version="$1"
+    local notes="$2"
+    local prerelease_flag="$3"
+    local tag="v$version"
+    local title="Adaptive Cover Pro ⛅ v$version"
+
+    log_step "Editing GitHub release"
+
+    # Create temporary file for notes
+    local notes_file
+    notes_file=$(mktemp)
+    echo "$notes" > "$notes_file"
+
+    # Build gh command
+    local cmd="gh release edit \"$tag\" --title \"$title\" --notes-file \"$notes_file\""
+
+    if [[ -n $prerelease_flag ]]; then
+        cmd="$cmd $prerelease_flag"
+    fi
+
+    execute "$cmd"
+
+    rm -f "$notes_file"
+
+    log_success "Updated release: $title"
+}
+
+verify_zip_asset() {
+    local tag="$1"
+    local asset_name="adaptive_cover_pro.zip"
+
+    log_step "Verifying ZIP asset"
+
+    if is_dry_run; then
+        log_dry_run "Would verify $asset_name exists on release $tag"
+        return 0
+    fi
+
+    # Get release assets
+    local assets
+    assets=$(gh release view "$tag" --json assets --jq '.assets[].name')
+
+    if echo "$assets" | grep -q "$asset_name"; then
+        log_success "ZIP asset verified: $asset_name"
+
+        # Get asset size
+        local size
+        size=$(gh release view "$tag" --json assets --jq ".assets[] | select(.name == \"$asset_name\") | .size")
+
+        if [[ -n $size ]]; then
+            local size_kb=$((size / 1024))
+            log_info "Asset size: ${size_kb}KB"
+
+            if [[ $size_kb -lt 100 ]]; then
+                log_warning "Asset size seems small (${size_kb}KB < 100KB)"
+            elif [[ $size_kb -gt 500 ]]; then
+                log_warning "Asset size seems large (${size_kb}KB > 500KB)"
+            fi
+        fi
+
+        return 0
+    else
+        log_error "ZIP asset not found: $asset_name"
+        log_info "Available assets:"
+        echo "$assets" | sed 's/^/  - /'
+        log_info "Check workflow: gh run list --workflow=publish-release.yml"
+        exit 1
+    fi
+}
+
+get_release_url() {
+    local tag="$1"
+
+    if is_dry_run; then
+        echo "https://github.com/jrhubott/adaptive-cover/releases/tag/$tag"
+    else
+        gh release view "$tag" --json url --jq '.url'
+    fi
+}
+
+# ============================================================================
+# Interactive Mode Functions
+# ============================================================================
+
+interactive_version_selection() {
+    echo ""
+    echo -e "${BOLD}Select version increment type:${RESET}"
+    echo ""
+    echo "  1) Beta (auto-increment beta version)"
+    echo "  2) Patch (increment X.Y.Z+1)"
+    echo "  3) Minor (increment X.Y+1.0)"
+    echo "  4) Major (increment X+1.0.0)"
+    echo "  5) Custom (enter explicit version)"
+    echo ""
+
+    local choice
+    read -r -p "Choice [1-5]: " choice
+
+    case "$choice" in
+        1) echo "beta" ;;
+        2) echo "patch" ;;
+        3) echo "minor" ;;
+        4) echo "major" ;;
+        5)
+            echo ""
+            read -r -p "Enter version (e.g., 2.5.1 or 2.5.1-beta.8): " custom_version
+            echo "$custom_version"
+            ;;
+        *)
+            log_error "Invalid choice: $choice"
+            exit 1
+            ;;
+    esac
+}
+
+confirm_release() {
+    local current_version="$1"
+    local new_version="$2"
+    local release_type="$3"
+    local current_branch
+    current_branch=$(git branch --show-current)
+
+    echo ""
+    echo -e "${BOLD}Release Summary:${RESET}"
+    echo ""
+    echo "  Current version: $current_version"
+    echo "  New version:     $new_version"
+    echo "  Release type:    $release_type"
+    echo "  Branch:          $current_branch"
+    echo "  Tag:             v$new_version"
+    echo ""
+
+    if [[ $DRY_RUN == true ]]; then
+        echo -e "${CYAN}  Mode: DRY RUN (no changes will be made)${RESET}"
+        echo ""
+    fi
+
+    confirm "Proceed with release?" "n"
+}
+
+# ============================================================================
+# Main Function
+# ============================================================================
+
+main() {
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            --yes|-y)
+                AUTO_YES=true
+                shift
+                ;;
+            --editor|-e)
+                USE_EDITOR=true
+                shift
+                ;;
+            --notes)
+                NOTES_FILE="$2"
+                shift 2
+                ;;
+            --auto-notes)
+                AUTO_NOTES=true
+                shift
+                ;;
+            --force-branch)
+                FORCE_BRANCH=true
+                shift
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                echo "Run with --help for usage information"
+                exit 1
+                ;;
+            *)
+                if [[ -z $VERSION_SPEC ]]; then
+                    VERSION_SPEC="$1"
+                else
+                    log_error "Unexpected argument: $1"
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # Print header
+    echo ""
+    echo -e "${BOLD}${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${BOLD}  Adaptive Cover Pro ⛅ Release Automation${RESET}"
+    echo -e "${BOLD}${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo ""
+
+    # Validate environment
+    validate_environment
+
+    # Get current version
+    CURRENT_VERSION=$(get_current_version)
+    log_info "Current version: $CURRENT_VERSION"
+
+    # Interactive mode if no version spec provided
+    if [[ -z $VERSION_SPEC ]]; then
+        VERSION_SPEC=$(interactive_version_selection)
+    fi
+
+    # Calculate new version
+    NEW_VERSION=$(calculate_new_version "$VERSION_SPEC" "$CURRENT_VERSION")
+    log_info "New version: $NEW_VERSION"
+
+    # Validate version format
+    validate_version_format "$NEW_VERSION"
+
+    # Validate branch
+    validate_branch
+
+    # Check tag doesn't exist
+    check_tag_exists
+
+    # Confirm release
+    if ! confirm_release "$CURRENT_VERSION" "$NEW_VERSION" "$RELEASE_TYPE"; then
+        log_info "Release cancelled"
+        exit 0
+    fi
+
+    # Get release notes
+    RELEASE_NOTES=$(get_release_notes "$NEW_VERSION" "$RELEASE_TYPE")
+
+    # Update manifest.json
+    update_manifest_version "$NEW_VERSION"
+
+    # Create commit
+    create_version_commit "$NEW_VERSION"
+
+    # Create tag
+    create_annotated_tag "$NEW_VERSION" "$RELEASE_NOTES"
+
+    # Push commit and tag
+    push_commit_and_tag "$NEW_VERSION"
+
+    # Wait for workflow
+    wait_for_workflow "v$NEW_VERSION"
+
+    # Edit release
+    edit_release "$NEW_VERSION" "$RELEASE_NOTES" "$PRERELEASE_FLAG"
+
+    # Verify ZIP asset
+    verify_zip_asset "v$NEW_VERSION"
+
+    # Success!
+    local release_url
+    release_url=$(get_release_url "v$NEW_VERSION")
+
+    echo ""
+    echo -e "${BOLD}${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${BOLD}${GREEN}  Release created successfully! 🎉${RESET}"
+    echo -e "${BOLD}${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo ""
+    echo "  Version:      v$NEW_VERSION"
+    echo "  Release type: $RELEASE_TYPE"
+    echo "  URL:          $release_url"
+    echo ""
+
+    if [[ $RELEASE_TYPE == "beta" ]]; then
+        log_warning "This is a BETA release - please test thoroughly"
+    fi
+}
+
+# ============================================================================
+# Entry Point
+# ============================================================================
+
+main "$@"
