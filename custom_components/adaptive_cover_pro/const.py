@@ -74,6 +74,7 @@ CONF_MANUAL_OVERRIDE_RESET = "manual_override_reset"
 CONF_MANUAL_THRESHOLD = "manual_threshold"
 CONF_MANUAL_IGNORE_INTERMEDIATE = "manual_ignore_intermediate"
 CONF_OPEN_CLOSE_THRESHOLD = "open_close_threshold"
+CONF_ENABLE_DIAGNOSTICS = "enable_diagnostics"
 
 # Import flow constants
 LEGACY_DOMAIN = "adaptive_cover"
@@ -153,3 +154,15 @@ class SensorType:
     BLIND = "cover_blind"
     AWNING = "cover_awning"
     TILT = "cover_tilt"
+
+
+class ControlStatus:
+    """Control status options for diagnostic sensor."""
+
+    ACTIVE = "active"
+    OUTSIDE_TIME_WINDOW = "outside_time_window"
+    POSITION_DELTA_TOO_SMALL = "position_delta_too_small"
+    TIME_DELTA_TOO_SMALL = "time_delta_too_small"
+    MANUAL_OVERRIDE = "manual_override"
+    AUTOMATIC_CONTROL_OFF = "automatic_control_off"
+    SUN_NOT_VISIBLE = "sun_not_visible"
