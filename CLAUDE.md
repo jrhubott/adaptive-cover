@@ -43,6 +43,111 @@ Pre-commit hooks run automatically on commit:
 - Prettier for YAML/JSON
 - Trailing whitespace cleanup
 
+## ⚠️ CRITICAL: Git Workflow Requirements
+
+**BEFORE MAKING ANY CODE CHANGES, YOU MUST:**
+
+### Step 1: Check Current Branch
+```bash
+git branch --show-current
+```
+
+### Step 2: Create a Feature Branch (REQUIRED)
+
+**If you're on `main`:**
+```bash
+# STOP! Do NOT work on main directly
+# Create a feature branch first:
+git checkout -b feature/descriptive-name
+
+# Examples:
+git checkout -b feature/config-flow-ui-improvements
+git checkout -b feature/add-shade-control
+git checkout -b fix/climate-mode-bug
+```
+
+**NEVER:**
+- ❌ Make commits directly to `main` branch
+- ❌ Start coding before creating a feature branch
+- ❌ Skip feature branches "because it's a small change"
+
+**ALWAYS:**
+- ✅ Create a feature branch FIRST (before any edits)
+- ✅ Use descriptive branch names (feature/*, fix/*, docs/*)
+- ✅ Keep commits atomic and focused
+- ✅ Test changes on the feature branch
+
+### Step 3: Work on Feature Branch
+```bash
+# Make your changes
+# Commit regularly
+git add <files>
+git commit -m "descriptive message"
+```
+
+### Step 4: Release Strategy by Branch
+
+**Feature Branch (feature/*, fix/*):**
+- Create BETA releases: `./scripts/release beta --notes /tmp/release_notes.md --yes`
+- Mark as prerelease for testing
+- Beta version format: `v2.7.0-beta.1`
+
+**Main Branch:**
+- Create STABLE releases: `./scripts/release patch` (or minor/major)
+- Only merge to main after beta testing is successful
+- Stable version format: `v2.7.0`
+
+### Why This Matters
+
+**Working on main directly causes:**
+- ❌ Accidental stable releases of untested code
+- ❌ Difficult to roll back changes
+- ❌ Can't test changes in isolation
+- ❌ Breaks the beta testing workflow
+- ❌ Confusion about release status
+
+**Using feature branches enables:**
+- ✅ Safe beta testing before merging to main
+- ✅ Easy rollback if issues found
+- ✅ Clear separation of stable vs. testing code
+- ✅ Proper release workflow (beta → main → stable)
+- ✅ Multiple features can be developed in parallel
+
+### Example Workflow
+
+```bash
+# 1. Start with main branch
+git checkout main
+git pull origin main
+
+# 2. Create feature branch
+git checkout -b feature/my-new-feature
+
+# 3. Make changes and commit
+git add <files>
+git commit -m "feat: Add new feature"
+
+# 4. Push feature branch
+git push -u origin feature/my-new-feature
+
+# 5. Create beta release from feature branch
+./scripts/release beta --notes /tmp/release_notes.md --yes
+
+# 6. Test beta release thoroughly
+
+# 7. After successful testing, merge to main
+git checkout main
+git merge feature/my-new-feature
+git push origin main
+
+# 8. Create stable release from main
+./scripts/release patch --notes /tmp/release_notes.md --yes
+
+# 9. Clean up feature branch
+git branch -d feature/my-new-feature
+git push origin --delete feature/my-new-feature
+```
+
 ### Release
 ```bash
 ./scripts/release              # Create a release (interactive)
@@ -296,8 +401,11 @@ Config is stored in two layers:
 4. **Entity Platform Pattern** - Separate platform files register entities
 5. **Config Flow Pattern** - Multi-step UI-based configuration
 
-## Workflow Rules
-- ALWAYS create a git feature branch before making changes
+## Development Workflow Summary
+
+**CRITICAL REQUIREMENTS** (See detailed workflow above):
+- ⚠️ **ALWAYS create a git feature branch BEFORE making any changes** (see [Git Workflow Requirements](#️-critical-git-workflow-requirements))
+- ⚠️ **NEVER work directly on main branch** - Create feature branches for ALL changes
 - Keep commits atomic and focused
 - Never refactor code unless explicitly asked
 - **ALWAYS add or update tests when adding features or changing logic**
@@ -305,6 +413,11 @@ Config is stored in two layers:
   - Logic changes require updating existing tests to match new behavior
   - Aim for 90%+ coverage for core calculation logic
   - See [UNIT_TESTS.md](UNIT_TESTS.md) for testing patterns and best practices
+
+**Release Workflow:**
+- Feature branch → Beta release (`v2.7.0-beta.1`)
+- After testing → Merge to main
+- Main branch → Stable release (`v2.7.0`)
 
 ## Feature Planning
 
@@ -423,15 +536,24 @@ When creating releases, follow these guidelines:
    gh release view vX.Y.Z --json assets
    ```
 
-6. **Determining Release Type by Branch**
-   - **Feature branch** → Create a beta release (e.g., v2.5.0-beta.1)
+6. **Determining Release Type by Branch** ⚠️ CRITICAL
+
+   **EXPECTED WORKFLOW (Do this):**
+   - **Feature branch** (feature/*, fix/*) → Create a BETA release
+     - Example: `git checkout -b feature/my-feature` then `./scripts/release beta`
      - Use beta version numbers: `MAJOR.MINOR.PATCH-beta.N`
      - Mark as prerelease in GitHub
      - Include testing instructions and warnings
-   - **Main branch** → Create a full release (e.g., v2.5.0)
+     - Test thoroughly before merging to main
+
+   - **Main branch** → Create a STABLE release (after beta testing)
+     - Only merge to main AFTER successful beta testing
+     - Example: `git checkout main && git merge feature/my-feature` then `./scripts/release patch`
      - Use standard semantic versioning: `MAJOR.MINOR.PATCH`
      - Not marked as prerelease (production-ready)
      - Should follow successful beta testing
+
+   **⚠️ WARNING:** If you find yourself about to create a beta release from main, STOP! You should have created a feature branch first. This is a workflow violation and indicates you worked on main directly (which should never happen).
 
 7. **Beta Release Guidelines**
    - Mark as prerelease: `gh release edit vX.Y.Z-beta.N --prerelease`
