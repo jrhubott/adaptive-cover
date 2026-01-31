@@ -193,7 +193,7 @@ Restart Home-Assistant and add the integration.
 
 ### Manual
 
-Download the `adaptive_cover` folder from this github.
+Download the `adaptive_cover_pro` folder from this github.
 Add the folder to `config/custom_components/`.
 
 Restart Home-Assistant and add the integration.
