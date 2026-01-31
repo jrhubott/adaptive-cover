@@ -27,6 +27,7 @@ from .const import (
     CONF_DELTA_TIME,
     CONF_DISTANCE,
     CONF_ENABLE_BLIND_SPOT,
+    CONF_ENABLE_DIAGNOSTICS,
     CONF_END_ENTITY,
     CONF_END_TIME,
     CONF_ENTITIES,
@@ -349,6 +350,7 @@ AUTOMATION_CONFIG = vol.Schema(
             selector.EntitySelectorConfig(domain=["sensor", "input_datetime"])
         ),
         vol.Optional(CONF_RETURN_SUNSET, default=False): bool,
+        vol.Optional(CONF_ENABLE_DIAGNOSTICS, default=False): bool,
     }
 )
 

@@ -51,6 +51,7 @@ from .const import (
     CONF_DELTA_TIME,
     CONF_DISTANCE,
     CONF_ENABLE_BLIND_SPOT,
+    CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_MAX_POSITION,
     CONF_ENABLE_MIN_POSITION,
     CONF_END_ENTITY,
@@ -98,6 +99,7 @@ from .const import (
     CONF_WEATHER_STATE,
     CONF_OPEN_CLOSE_THRESHOLD,
     DOMAIN,
+    ControlStatus,
     LOGGER,
 )
 from .helpers import (
@@ -125,6 +127,7 @@ class AdaptiveCoverData:
     climate_mode_toggle: bool
     states: dict
     attributes: dict
+    diagnostics: dict | None = None
 
 
 class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
@@ -351,6 +354,12 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.logger.debug("Sun start time: %s, Sun end time: %s", start, end)
         else:
             start, end = self._sun_start_time, self._sun_end_time
+
+        # Build diagnostic data if enabled
+        diagnostics = None
+        if options.get(CONF_ENABLE_DIAGNOSTICS, False):
+            diagnostics = self.build_diagnostic_data()
+
         return AdaptiveCoverData(
             climate_mode_toggle=self.switch_mode,
             states={
@@ -373,6 +382,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 ],
                 "blind_spot": options.get(CONF_BLIND_SPOT_ELEVATION),
             },
+            diagnostics=diagnostics,
         )
 
     async def async_handle_state_change(self, state: int, options):
@@ -795,6 +805,72 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             options.get(CONF_TILT_DEPTH),
             options.get(CONF_TILT_MODE),
         ]
+
+    def build_diagnostic_data(self) -> dict:
+        """Build diagnostic data for diagnostic sensors."""
+        diagnostics = {}
+
+        # Solar position data
+        sun_azimuth, sun_elevation = self.pos_sun
+        diagnostics["sun_azimuth"] = sun_azimuth
+        diagnostics["sun_elevation"] = sun_elevation
+
+        # Gamma (surface solar azimuth)
+        if self.normal_cover_state and hasattr(self.normal_cover_state.cover, "gamma"):
+            diagnostics["gamma"] = self.normal_cover_state.cover.gamma
+
+        # Calculated positions
+        diagnostics["calculated_position"] = self.default_state
+        if self.climate_state is not None:
+            diagnostics["calculated_position_climate"] = self.climate_state
+
+        # Control status determination
+        control_status = self._determine_control_status()
+        diagnostics["control_status"] = control_status
+
+        # Time window status
+        diagnostics["time_window"] = {
+            "check_adaptive_time": self.check_adaptive_time,
+            "after_start_time": self.after_start_time,
+            "before_end_time": self.before_end_time,
+            "start_time": self._start_time,
+            "end_time": self._end_time,
+        }
+
+        # Sun validity status
+        if self.normal_cover_state and self.normal_cover_state.cover:
+            cover = self.normal_cover_state.cover
+            diagnostics["sun_validity"] = {
+                "valid": cover.valid,
+                "valid_elevation": cover.valid_elevation,
+                "in_blind_spot": getattr(cover, "in_blind_spot", None),
+            }
+
+        # Climate data if enabled
+        if self._climate_mode and self.climate_state is not None:
+            diagnostics["climate_control_method"] = self.control_method
+            # Access climate data through ClimateCoverState if available
+            # This will be populated when climate mode is active
+
+        return diagnostics
+
+    def _determine_control_status(self) -> str:
+        """Determine the current control status."""
+        if not self.automatic_control:
+            return ControlStatus.AUTOMATIC_CONTROL_OFF
+
+        if self.manager.binary_cover_manual:
+            return ControlStatus.MANUAL_OVERRIDE
+
+        if not self.check_adaptive_time:
+            return ControlStatus.OUTSIDE_TIME_WINDOW
+
+        if self.normal_cover_state and not self.normal_cover_state.cover.valid:
+            return ControlStatus.SUN_NOT_VISIBLE
+
+        # For position/time delta, we'd need to check per-cover, so we default to active
+        # if all other checks pass
+        return ControlStatus.ACTIVE
 
     @property
     def state(self) -> int:
