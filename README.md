@@ -1,4 +1,8 @@
 ![Version](https://img.shields.io/github/v/release/jrhubott/adaptive-cover?style=for-the-badge)
+![Tests](https://img.shields.io/github/actions/workflow/status/jrhubott/adaptive-cover/tests.yml?branch=main&label=Tests&style=for-the-badge)
+![Hassfest](https://img.shields.io/github/actions/workflow/status/jrhubott/adaptive-cover/hassfest.yml?branch=main&label=Hassfest&style=for-the-badge)
+![HACS](https://img.shields.io/github/actions/workflow/status/jrhubott/adaptive-cover/hacs.yaml?branch=main&label=HACS&style=for-the-badge)
+![Coverage](https://img.shields.io/codecov/c/github/jrhubott/adaptive-cover?style=for-the-badge)
 
 ![logo](https://github.com/jrhubott/adaptive-cover/blob/main/images/logo.png#gh-light-mode-only)
 ![logo](https://github.com/jrhubott/adaptive-cover/blob/main/images/dark_logo.png#gh-dark-mode-only)

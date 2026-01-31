@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#
+# Test runner for Adaptive Cover Pro
+#
+# Usage:
+#   ./scripts/test              # Run all tests
+#   ./scripts/test unit         # Run only unit tests
+#   ./scripts/test coverage     # Run with detailed coverage
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+GREEN='\033[0;32m'
+RESET='\033[0m'
+
+echo -e "${GREEN}Adaptive Cover Pro Test Runner${RESET}"
+echo ""
+
+case "${1:-all}" in
+  unit)
+    echo "Running unit tests only..."
+    pytest -m unit -v
+    ;;
+  coverage)
+    echo "Running all tests with detailed coverage..."
+    pytest --cov --cov-report=term-missing --cov-report=html
+    echo ""
+    echo "Coverage report: htmlcov/index.html"
+    ;;
+  all|*)
+    echo "Running all tests..."
+    pytest -v
+    ;;
+esac
