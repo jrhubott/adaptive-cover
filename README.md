@@ -15,10 +15,21 @@ This integration builds upon the template sensor from this forum post [Automatic
 
 This fork includes enhancements and modifications, but the core functionality and architecture are based on Bas Brussee's excellent work. Please visit the [original repository](https://github.com/basbruss/adaptive-cover) to see the upstream project and consider supporting the original author.
 
+## For Developers
+
+If you're interested in contributing to this project, please see the **[Development Guide (DEVELOPMENT.md)](DEVELOPMENT.md)** for comprehensive documentation on:
+- Setting up your development environment
+- Project structure and architecture
+- Development workflow and scripts
+- Testing strategies
+- **Release process** (automated with `./scripts/release`)
+- Code standards and best practices
+
 ## Table of Contents
 
 - [Adaptive Cover Pro](#adaptive-cover-pro)
   - [Credits](#credits)
+  - [For Developers](#for-developers)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
   - [Known Limitations & Best Practices](#known-limitations--best-practices)
