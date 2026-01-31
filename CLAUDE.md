@@ -353,6 +353,7 @@ When creating releases, follow these guidelines:
 
 3. **Release Notes**
    - **NEVER** include `Co-Authored-By:` lines in release notes
+   - **NEVER** include Claude/AI attributions (e.g., "Generated with Claude Code")
    - Use clear, user-friendly language with emoji section headers
    - Include: Features, Documentation, Technical Details, Installation, Testing sections
    - For beta releases, mark as prerelease and include testing guidance
