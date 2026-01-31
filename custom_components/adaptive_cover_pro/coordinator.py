@@ -399,9 +399,18 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     async def async_handle_cover_state_change(self, state: int):
         """Handle state change from assigned covers."""
         if self.manual_toggle and self.automatic_control:
+            # Get the entity_id from state_change_data
+            entity_id = self.state_change_data.entity_id
+
+            # Use target_call if available (contains actual sent position),
+            # otherwise fall back to calculated state.
+            # This is critical for open/close-only covers where the calculated
+            # state gets transformed (via threshold) to 0 or 100 before sending.
+            expected_position = self.target_call.get(entity_id, state)
+
             self.manager.handle_state_change(
                 self.state_change_data,
-                state,
+                expected_position,
                 self._cover_type,
                 self.manual_reset,
                 self.wait_for_target,
