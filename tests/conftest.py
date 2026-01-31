@@ -130,3 +130,137 @@ def mock_state():
         state_obj.attributes = attributes or {}
         return state_obj
     return _create_state
+
+
+@pytest.fixture
+def vertical_cover_instance(hass, mock_logger):
+    """Real AdaptiveVerticalCover instance for testing."""
+    from custom_components.adaptive_cover_pro.calculation import AdaptiveVerticalCover
+
+    return AdaptiveVerticalCover(
+        hass=hass,
+        logger=mock_logger,
+        sol_azi=180.0,
+        sol_elev=45.0,
+        sunset_pos=0,
+        sunset_off=0,
+        sunrise_off=0,
+        timezone="UTC",
+        fov_left=45,
+        fov_right=45,
+        win_azi=180,
+        h_def=50,
+        max_pos=100,
+        min_pos=0,
+        max_pos_bool=False,
+        min_pos_bool=False,
+        blind_spot_left=None,
+        blind_spot_right=None,
+        blind_spot_elevation=None,
+        blind_spot_on=False,
+        min_elevation=None,
+        max_elevation=None,
+        distance=0.5,
+        h_win=2.0,
+    )
+
+
+@pytest.fixture
+def horizontal_cover_instance(hass, mock_logger):
+    """Real AdaptiveHorizontalCover instance for testing."""
+    from custom_components.adaptive_cover_pro.calculation import AdaptiveHorizontalCover
+
+    return AdaptiveHorizontalCover(
+        hass=hass,
+        logger=mock_logger,
+        sol_azi=180.0,
+        sol_elev=45.0,
+        sunset_pos=0,
+        sunset_off=0,
+        sunrise_off=0,
+        timezone="UTC",
+        fov_left=45,
+        fov_right=45,
+        win_azi=180,
+        h_def=100,
+        max_pos=100,
+        min_pos=0,
+        max_pos_bool=False,
+        min_pos_bool=False,
+        blind_spot_left=None,
+        blind_spot_right=None,
+        blind_spot_elevation=None,
+        blind_spot_on=False,
+        min_elevation=None,
+        max_elevation=None,
+        distance=0.5,
+        h_win=2.0,
+        awn_length=2.0,
+        awn_angle=0,
+    )
+
+
+@pytest.fixture
+def tilt_cover_instance(hass, mock_logger):
+    """Real AdaptiveTiltCover instance for testing."""
+    from custom_components.adaptive_cover_pro.calculation import AdaptiveTiltCover
+
+    return AdaptiveTiltCover(
+        hass=hass,
+        logger=mock_logger,
+        sol_azi=180.0,
+        sol_elev=45.0,
+        sunset_pos=0,
+        sunset_off=0,
+        sunrise_off=0,
+        timezone="UTC",
+        fov_left=45,
+        fov_right=45,
+        win_azi=180,
+        h_def=50,
+        max_pos=100,
+        min_pos=0,
+        max_pos_bool=False,
+        min_pos_bool=False,
+        blind_spot_left=None,
+        blind_spot_right=None,
+        blind_spot_elevation=None,
+        blind_spot_on=False,
+        min_elevation=None,
+        max_elevation=None,
+        slat_distance=0.03,
+        depth=0.02,
+        mode="mode1",
+    )
+
+
+@pytest.fixture
+def climate_data_instance(hass, mock_logger, mock_state):
+    """ClimateCoverData instance with mocked entities."""
+    from custom_components.adaptive_cover_pro.calculation import ClimateCoverData
+
+    # Mock temperature sensor
+    temp_state = mock_state("sensor.outside_temp", "22.5", {})
+    hass.states.get.return_value = temp_state
+
+    return ClimateCoverData(
+        hass=hass,
+        logger=mock_logger,
+        temp_entity="sensor.inside_temp",
+        temp_low=20.0,
+        temp_high=25.0,
+        presence_entity="binary_sensor.presence",
+        weather_entity="weather.home",
+        weather_condition=["sunny", "partlycloudy"],
+        outside_entity="sensor.outside_temp",
+        temp_switch=True,
+        blind_type="cover_blind",
+        transparent_blind=False,
+        lux_entity="sensor.lux",
+        irradiance_entity="sensor.solar",
+        lux_threshold=5000,
+        irradiance_threshold=300,
+        temp_summer_outside=22.0,
+        _use_lux=False,
+        _use_irradiance=False,
+    )
