@@ -672,6 +672,7 @@ class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
             coordinator,
             "Last Cover Action",
             "last_cover_action",
+            None,  # unit (text sensor has no unit)
             "mdi:history",
         )
 
