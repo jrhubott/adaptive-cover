@@ -311,6 +311,128 @@ The `config/configuration.yaml` file contains mock entities for testing:
 
 Edit this file to create the test scenarios you need.
 
+### Automated Tests
+
+This integration uses pytest for automated testing.
+
+#### Running Tests Locally
+
+```bash
+# Install test dependencies
+pip install -r requirements-dev.txt
+
+# Run all tests
+pytest
+
+# Run with coverage report
+pytest --cov --cov-report=term-missing
+
+# Run specific test file
+pytest tests/test_calculation.py
+
+# Run specific test
+pytest tests/test_calculation.py::test_gamma_angle_calculation_sun_directly_in_front
+
+# Run only unit tests (fast)
+pytest -m unit
+
+# Run with verbose output
+pytest -v
+
+# Use the test script
+./scripts/test              # Run all tests
+./scripts/test unit         # Run only unit tests
+./scripts/test coverage     # Run with detailed coverage
+```
+
+#### Test Structure
+
+- `tests/conftest.py` - Shared fixtures (hass mock, logger, configs)
+- `tests/test_calculation.py` - Position calculation tests (25 tests, unit)
+- `tests/test_helpers.py` - Helper function tests (30 tests, unit)
+- `tests/test_inverse_state.py` - Critical inverse state tests (13 tests, unit)
+
+**Total: 68 tests**
+
+#### Test Coverage
+
+Current test coverage focuses on core functionality:
+
+- **helpers.py**: 100% coverage - All utility functions tested
+- **const.py**: 100% coverage - Constants validated
+- **calculation.py**: 31% coverage - Key algorithms tested
+- **coordinator.py**: 22% coverage - Critical paths tested
+- **Overall**: 20% coverage
+
+#### Writing Tests
+
+Tests use pytest fixtures from `conftest.py`. Example:
+
+```python
+import pytest
+from custom_components.adaptive_cover_pro.helpers import get_safe_state
+
+@pytest.mark.unit
+def test_get_safe_state_returns_state(hass):
+    """Test get_safe_state returns state when available."""
+    state_obj = MagicMock()
+    state_obj.state = "25.5"
+    hass.states.get.return_value = state_obj
+
+    result = get_safe_state(hass, "sensor.temperature")
+
+    assert result == "25.5"
+```
+
+**Best Practices:**
+- Use descriptive test names that explain what is being tested
+- Add docstrings explaining the test purpose
+- Mark tests with `@pytest.mark.unit` for fast tests
+- Use fixtures from `conftest.py` for common setup
+- Keep tests simple and focused on one behavior
+
+#### Continuous Integration
+
+Tests run automatically on:
+- Pull requests
+- Pushes to main branch
+- Pushes to feature branches
+- Manual workflow dispatch
+
+See `.github/workflows/tests.yml` for CI configuration.
+
+**CI Matrix:**
+- Python 3.11
+- Python 3.12
+
+**CI Steps:**
+1. Checkout code
+2. Set up Python environment
+3. Install dependencies
+4. Run tests with coverage
+5. Upload coverage to Codecov (Python 3.12 only)
+
+#### Test Philosophy
+
+**Priority Order:**
+1. **Pure functions** - Test utilities and helpers first (easiest)
+2. **Critical behaviors** - Test inverse_state and documented behaviors
+3. **Core algorithms** - Test calculation logic
+4. **Integration** - Test coordinator and flows (future)
+
+**What We Test:**
+- Pure utility functions (no I/O)
+- Position calculation algorithms
+- Sun angle and azimuth calculations
+- Blind spot detection logic
+- Position clamping and validation
+- Critical documented behaviors (inverse state order of operations)
+
+**What We Don't Test (Yet):**
+- Async coordinator logic (complex, lower priority initially)
+- Config flow UI (requires Home Assistant test framework)
+- Entity registration (lower ROI, can be added later)
+
 ### Testing the Release Script
 
 The release script supports dry-run mode for safe testing:
