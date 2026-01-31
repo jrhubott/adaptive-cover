@@ -1178,6 +1178,37 @@ The `inverse_state` feature handles covers that don't follow Home Assistant guid
 
 See CLAUDE.md "Inverse State Behavior" section for full details.
 
+### Configuration Flow UI
+
+The integration provides a comprehensive multi-step configuration UI (`config_flow.py`):
+
+**Enhanced User Experience:**
+- **Rich Field Descriptions:** Every configuration field includes detailed descriptions with practical examples, recommended values, and context
+- **Visual Units:** All numeric selectors display appropriate units (°, %, m, cm, minutes, lux, W/m²)
+- **Consistent Interface:** NumberSelector with sliders for most numeric inputs, providing clear min/max bounds
+- **Technical Term Explanations:** Complex concepts like azimuth, FOV (field of view), and elevation are explained in user-friendly language
+
+**Translation Support:**
+- English descriptions are in `strings.json` (base file) and `translations/en.json`
+- Additional languages supported: German (de), Spanish (es), French (fr), Dutch (nl), Slovak (sk)
+- Translations can be added by copying `strings.json` structure and translating the `data_description` values
+
+**Configuration Steps:**
+1. Initial setup: Choose cover type (vertical/horizontal/tilt)
+2. Cover-specific settings: Dimensions, orientation, tracking parameters
+3. Automation settings: Delta position/time, manual override, start/end times
+4. Climate mode (optional): Temperature, presence, weather, lux/irradiance sensors
+5. Weather conditions (if climate mode enabled)
+6. Blind spot (optional): Define obstacles that block sun
+7. Interpolation (optional): Custom position mapping for non-standard covers
+
+**Best Practices for Config Flow Changes:**
+- Always add `data_description` for new fields in `strings.json`
+- Use `NumberSelector` with `unit_of_measurement` for all numeric inputs
+- Provide practical examples and typical values in descriptions
+- Test configuration flow on mobile and desktop interfaces
+- Keep descriptions concise but informative (2-4 sentences ideal)
+
 ## Additional Resources
 
 - **User Documentation:** [README.md](README.md)

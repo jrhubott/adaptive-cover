@@ -281,6 +281,8 @@ Each type has its own specific parameters to setup a sensor. To setup the sensor
 
 During setup, the integration will automatically suggest a device name based on the first cover entity you select, prefixed with "Adaptive" (e.g., "Living Room Blind" becomes "Adaptive Living Room Blind"). You can modify this suggested name if desired.
 
+**Enhanced Configuration UI:** The setup flow includes comprehensive descriptions for every configuration field, with practical examples, recommended values, and explanations of technical terms. Each field now provides context about why it matters and how it affects cover behavior, making configuration easier for both new and experienced users.
+
 ## Cover Types
 
 |              | Vertical                      | Horizontal                      | Tilted                          |

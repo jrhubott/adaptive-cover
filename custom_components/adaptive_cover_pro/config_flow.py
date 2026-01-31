@@ -118,19 +118,27 @@ OPTIONS = vol.Schema(
                 min=0, max=100, step=1, mode="slider", unit_of_measurement="%"
             )
         ),
-        vol.Optional(CONF_MAX_POSITION): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=100)
+        vol.Optional(CONF_MAX_POSITION): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1, max=100, step=1, mode="slider", unit_of_measurement="%"
+            )
         ),
         vol.Optional(CONF_ENABLE_MAX_POSITION, default=False): bool,
-        vol.Optional(CONF_MIN_POSITION): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=99)
+        vol.Optional(CONF_MIN_POSITION): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=99, step=1, mode="slider", unit_of_measurement="%"
+            )
         ),
         vol.Optional(CONF_ENABLE_MIN_POSITION, default=False): bool,
-        vol.Optional(CONF_MIN_ELEVATION): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=90)
+        vol.Optional(CONF_MIN_ELEVATION): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=90, step=1, mode="slider", unit_of_measurement="°"
+            )
         ),
-        vol.Optional(CONF_MAX_ELEVATION): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=90)
+        vol.Optional(CONF_MAX_ELEVATION): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=90, step=1, mode="slider", unit_of_measurement="°"
+            )
         ),
         vol.Required(CONF_FOV_LEFT, default=90): selector.NumberSelector(
             selector.NumberSelectorConfig(
@@ -336,8 +344,10 @@ AUTOMATION_CONFIG = vol.Schema(
             CONF_MANUAL_OVERRIDE_DURATION, default={"minutes": 15}
         ): selector.DurationSelector(),
         vol.Required(CONF_MANUAL_OVERRIDE_RESET, default=False): bool,
-        vol.Optional(CONF_MANUAL_THRESHOLD): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=99)
+        vol.Optional(CONF_MANUAL_THRESHOLD): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=99, step=1, mode="slider", unit_of_measurement="%"
+            )
         ),
         vol.Optional(CONF_MANUAL_IGNORE_INTERMEDIATE, default=False): bool,
         vol.Optional(CONF_OPEN_CLOSE_THRESHOLD, default=50): selector.NumberSelector(
@@ -356,11 +366,15 @@ AUTOMATION_CONFIG = vol.Schema(
 
 INTERPOLATION_OPTIONS = vol.Schema(
     {
-        vol.Optional(CONF_INTERP_START): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=100)
+        vol.Optional(CONF_INTERP_START): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=100, step=1, mode="slider", unit_of_measurement="%"
+            )
         ),
-        vol.Optional(CONF_INTERP_END): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=100)
+        vol.Optional(CONF_INTERP_END): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=100, step=1, mode="slider", unit_of_measurement="%"
+            )
         ),
         vol.Optional(CONF_INTERP_LIST, default=[]): selector.SelectSelector(
             selector.SelectSelectorConfig(
@@ -602,8 +616,10 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         mode="slider", unit_of_measurement="°", min=1, max=edges
                     )
                 ),
-                vol.Optional(CONF_BLIND_SPOT_ELEVATION): vol.All(
-                    vol.Coerce(int), vol.Range(min=0, max=90)
+                vol.Optional(CONF_BLIND_SPOT_ELEVATION): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0, max=90, step=1, mode="slider", unit_of_measurement="°"
+                    )
                 ),
             }
         )
@@ -1203,8 +1219,10 @@ class OptionsFlowHandler(OptionsFlow):
                         mode="slider", unit_of_measurement="°", min=1, max=edges
                     )
                 ),
-                vol.Optional(CONF_BLIND_SPOT_ELEVATION): vol.All(
-                    vol.Coerce(int), vol.Range(min=0, max=90)
+                vol.Optional(CONF_BLIND_SPOT_ELEVATION): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0, max=90, step=1, mode="slider", unit_of_measurement="°"
+                    )
                 ),
             }
         )
