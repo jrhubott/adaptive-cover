@@ -30,7 +30,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest pytest-asyncio pytest-cov
           pip install pandas astral numpy python-dateutil
-          pip install 'homeassistant>=2024.5.0'
+          pip install 'homeassistant>=2024.3.0'
 
       - name: Run tests with coverage
         run: |
