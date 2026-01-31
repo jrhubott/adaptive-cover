@@ -18,11 +18,18 @@ from homeassistant.const import (
 )
 from homeassistant.core import (
     Event,
-    EventStateChangedData,
     HomeAssistant,
     State,
     callback,
 )
+
+# EventStateChangedData was added in Home Assistant 2024.4+
+# For backwards compatibility with older versions
+try:
+    from homeassistant.core import EventStateChangedData
+except ImportError:
+    # Fallback for older Home Assistant versions
+    EventStateChangedData = dict  # type: ignore[misc,assignment]
 from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.helpers.template import state_attr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
