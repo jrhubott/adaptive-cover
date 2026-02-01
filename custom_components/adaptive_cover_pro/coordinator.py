@@ -404,7 +404,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 "start": start,
                 "end": end,
                 "control": self.control_method,
-                "sun_motion": normal_cover.valid,
+                "sun_motion": normal_cover.direct_sun_valid,
                 "manual_override": self.manager.binary_cover_manual,
                 "manual_list": self.manager.manual_controlled,
             },

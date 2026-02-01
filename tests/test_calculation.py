@@ -591,6 +591,131 @@ class TestAdaptiveGeneralCoverProperties:
 
     @pytest.mark.unit
     @patch("custom_components.adaptive_cover_pro.calculation.datetime")
+    def test_direct_sun_valid_all_conditions_met(self, mock_datetime, vertical_cover_instance):
+        """Test direct_sun_valid when all conditions are met."""
+        # Setup: sun in FOV, above horizon, before sunset, no blind spot
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1, 12, 0, 0)
+        vertical_cover_instance.sun_data.sunset = MagicMock(
+            return_value=datetime(2024, 1, 1, 18, 0, 0)
+        )
+        vertical_cover_instance.sun_data.sunrise = MagicMock(
+            return_value=datetime(2024, 1, 1, 6, 0, 0)
+        )
+        vertical_cover_instance.blind_spot_on = False
+
+        # All conditions met: valid=True, sunset_valid=False, blind_spot=False
+        assert vertical_cover_instance.direct_sun_valid is True
+
+    @pytest.mark.unit
+    @patch("custom_components.adaptive_cover_pro.calculation.datetime")
+    def test_direct_sun_valid_after_sunset(self, mock_datetime, vertical_cover_instance):
+        """Test direct_sun_valid returns False after sunset (reproduces bug scenario)."""
+        # Setup: sun still in FOV geometrically, but after sunset time
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1, 20, 0, 0)  # After sunset
+        vertical_cover_instance.sun_data.sunset = MagicMock(
+            return_value=datetime(2024, 1, 1, 18, 0, 0)
+        )
+        vertical_cover_instance.sun_data.sunrise = MagicMock(
+            return_value=datetime(2024, 1, 1, 6, 0, 0)
+        )
+        vertical_cover_instance.blind_spot_on = False
+
+        # valid should be True (geometric check)
+        assert vertical_cover_instance.valid is True
+        # But direct_sun_valid should be False (includes sunset check)
+        assert vertical_cover_instance.direct_sun_valid is False
+
+    @pytest.mark.unit
+    @patch("custom_components.adaptive_cover_pro.calculation.datetime")
+    def test_direct_sun_valid_in_blind_spot(self, mock_datetime, vertical_cover_instance):
+        """Test direct_sun_valid returns False when sun in blind spot."""
+        # Setup: sun in FOV and before sunset, but in blind spot
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1, 12, 0, 0)
+        vertical_cover_instance.sun_data.sunset = MagicMock(
+            return_value=datetime(2024, 1, 1, 18, 0, 0)
+        )
+        vertical_cover_instance.sun_data.sunrise = MagicMock(
+            return_value=datetime(2024, 1, 1, 6, 0, 0)
+        )
+
+        # Configure blind spot
+        vertical_cover_instance.blind_spot_left = 25
+        vertical_cover_instance.blind_spot_right = 35
+        vertical_cover_instance.blind_spot_elevation = 50
+        vertical_cover_instance.blind_spot_on = True
+        vertical_cover_instance.sol_azi = 165.0  # gamma = 15°, in blind spot
+        vertical_cover_instance.sol_elev = 30.0
+
+        # valid should be True (geometric check only)
+        assert vertical_cover_instance.valid is True
+        # is_sun_in_blind_spot should be True
+        assert vertical_cover_instance.is_sun_in_blind_spot is True
+        # direct_sun_valid should be False (includes blind spot check)
+        assert vertical_cover_instance.direct_sun_valid is False
+
+    @pytest.mark.unit
+    @patch("custom_components.adaptive_cover_pro.calculation.datetime")
+    def test_direct_sun_valid_outside_fov(self, mock_datetime, vertical_cover_instance):
+        """Test direct_sun_valid returns False when sun outside FOV."""
+        # Setup: sun outside FOV
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1, 12, 0, 0)
+        vertical_cover_instance.sun_data.sunset = MagicMock(
+            return_value=datetime(2024, 1, 1, 18, 0, 0)
+        )
+        vertical_cover_instance.sun_data.sunrise = MagicMock(
+            return_value=datetime(2024, 1, 1, 6, 0, 0)
+        )
+        vertical_cover_instance.sol_azi = 90.0  # Far outside FOV
+        vertical_cover_instance.blind_spot_on = False
+
+        # Both should be False
+        assert vertical_cover_instance.valid is False
+        assert vertical_cover_instance.direct_sun_valid is False
+
+    @pytest.mark.unit
+    @patch("custom_components.adaptive_cover_pro.calculation.datetime")
+    def test_direct_sun_valid_before_sunrise(self, mock_datetime, vertical_cover_instance):
+        """Test direct_sun_valid returns False before sunrise."""
+        # Setup: sun geometrically in FOV, but before sunrise
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1, 5, 0, 0)  # Before sunrise
+        vertical_cover_instance.sun_data.sunset = MagicMock(
+            return_value=datetime(2024, 1, 1, 18, 0, 0)
+        )
+        vertical_cover_instance.sun_data.sunrise = MagicMock(
+            return_value=datetime(2024, 1, 1, 6, 0, 0)
+        )
+        vertical_cover_instance.blind_spot_on = False
+
+        # valid could be True (if elevation is positive - edge case)
+        # But direct_sun_valid should be False (before sunrise)
+        assert vertical_cover_instance.direct_sun_valid is False
+
+    @pytest.mark.unit
+    @patch("custom_components.adaptive_cover_pro.calculation.datetime")
+    def test_direct_sun_valid_with_sunset_offset(self, mock_datetime, vertical_cover_instance):
+        """Test direct_sun_valid respects sunset offset."""
+        # Setup: time is after sunset but within offset
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1, 18, 15, 0)  # 15 min after sunset
+        vertical_cover_instance.sun_data.sunset = MagicMock(
+            return_value=datetime(2024, 1, 1, 18, 0, 0)
+        )
+        vertical_cover_instance.sun_data.sunrise = MagicMock(
+            return_value=datetime(2024, 1, 1, 6, 0, 0)
+        )
+        vertical_cover_instance.sunset_off = 30  # 30 minute offset
+        vertical_cover_instance.blind_spot_on = False
+
+        # With 30 min offset, sunset_valid should be False (not yet after offset)
+        # So direct_sun_valid should be True (if valid is True)
+        assert vertical_cover_instance.direct_sun_valid is True
+
+        # Now test beyond offset
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1, 18, 45, 0)  # 45 min after sunset
+        # Now sunset_valid should be True (after offset)
+        assert vertical_cover_instance.direct_sun_valid is False
+
+    @pytest.mark.unit
+    @patch("custom_components.adaptive_cover_pro.calculation.datetime")
     def test_default_position_before_sunset(self, mock_datetime, vertical_cover_instance):
         """Test default position returns h_def before sunset."""
         # Mock current time before sunset
