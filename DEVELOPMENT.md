@@ -1079,31 +1079,546 @@ logger:
 - Enable Last Cover Action diagnostic sensor
 - Check logs for "Manual override detected" messages
 
-### Using VS Code Debugger
+### VS Code Debugging Setup
 
-Create `.vscode/launch.json`:
+The project includes a complete VS Code debugging environment with pre-configured debug configurations, test integration, linting, and formatting.
 
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Home Assistant",
-      "type": "python",
-      "request": "launch",
-      "module": "homeassistant",
-      "args": [
-        "-c",
-        "config",
-        "--debug"
-      ],
-      "justMyCode": false
-    }
-  ]
-}
+#### Prerequisites
+
+Install the recommended VS Code extensions (you'll be prompted when opening the workspace):
+
+- **ms-python.python** - Core Python support
+- **ms-python.vscode-pylance** - Advanced IntelliSense and type checking
+- **ms-python.debugpy** - Python debugger
+- **charliermarsh.ruff** - Linting and formatting (matches project tools)
+- **keesschollaart.vscode-home-assistant** - Home Assistant YAML schemas
+- **redhat.vscode-yaml** - YAML language support
+- **esbenp.prettier-vscode** - YAML/JSON formatting
+- **ms-toolsai.jupyter** - Notebook support for `notebooks/test_env.ipynb`
+
+Or install manually:
+
+```bash
+code --install-extension ms-python.python
+code --install-extension ms-python.vscode-pylance
+code --install-extension ms-python.debugpy
+code --install-extension charliermarsh.ruff
 ```
 
-Set breakpoints in the code and launch with F5.
+#### Available Debug Configurations
+
+The workspace includes five pre-configured debug configurations (press F5 or click Run and Debug):
+
+##### 1. Debug Home Assistant
+
+Launches Home Assistant with the debugger attached. This matches the behavior of `./scripts/develop`:
+
+- Starts Home Assistant on port 8123
+- Enables debug mode and logging
+- Sets PYTHONPATH to include `custom_components/`
+- Allows stepping into Home Assistant core code
+
+**Usage:**
+1. Set breakpoints in integration code (e.g., `coordinator.py:337`)
+2. Press F5 and select "Debug Home Assistant"
+3. Wait for Home Assistant to start at http://localhost:8123
+4. Trigger coordinator updates (state changes, time passage)
+5. Breakpoint will be hit, inspect variables in Debug panel
+
+##### 2. Debug Current Test File
+
+Context-aware debugging of the currently open test file. Fast iteration on specific test modules.
+
+**Usage:**
+1. Open a test file (e.g., `tests/test_calculation.py`)
+2. Set breakpoint in test function
+3. Press F5 and select "Debug Current Test File"
+4. Test runs with debugger attached
+
+##### 3. Debug All Tests
+
+Runs the entire test suite (172 tests) with debugger support.
+
+**Usage:**
+- Press F5 and select "Debug All Tests"
+- Set breakpoints in test files or implementation code
+- Step through any failing tests
+
+##### 4. Debug Specific Test
+
+Debug a single test or group of tests by name/pattern using pytest's `-k` flag.
+
+**Usage:**
+1. Press F5 and select "Debug Specific Test"
+2. Enter test name or pattern when prompted:
+   - `test_gamma` - All tests with "gamma" in name
+   - `vertical` - All tests with "vertical" in name
+   - `test_calculation.py::test_gamma_angle` - Specific test
+
+##### 5. Debug calculation.py Tests
+
+Quick access to the most frequently debugged tests (129 calculation tests, 91% coverage).
+
+**Usage:**
+- Press F5 and select "Debug calculation.py Tests"
+- Set breakpoints in `calculation.py` or `test_calculation.py`
+
+#### Using the Debugger
+
+##### Setting Breakpoints
+
+Click in the gutter (left of line numbers) to set breakpoints. Common breakpoint locations:
+
+**Coordinator:**
+- `coordinator.py:337` - `_async_update_data()` - Main update loop
+- `coordinator.py:425` - `async_check_entity_state_change()` - State change handler
+- `coordinator.py:591` - `_async_move_cover()` - Cover control
+
+**Calculations:**
+- `calculation.py:150` - `AdaptiveVerticalCover.calculate_position()` - Vertical blind logic
+- `calculation.py:250` - `AdaptiveHorizontalCover.calculate_position()` - Awning logic
+- `calculation.py:350` - `AdaptiveTiltCover.calculate_position()` - Tilt logic
+- `calculation.py:500` - `ClimateCoverState.adapt_position()` - Climate mode adjustments
+
+**Config Flow:**
+- `config_flow.py:200` - `async_step_user()` - Initial setup
+- `config_flow.py:450` - `async_step_options()` - Options flow
+
+##### Debugger Controls
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| **F5** | Continue | Resume execution until next breakpoint |
+| **F10** | Step Over | Execute current line, don't step into functions |
+| **F11** | Step Into | Step into function calls |
+| **Shift+F11** | Step Out | Step out of current function |
+| **Shift+F5** | Stop | Stop debugging session |
+| **Cmd+Shift+F5** | Restart | Restart debugging session |
+
+##### Debugging Async Code
+
+Home Assistant is async-first. When debugging async code:
+
+1. **Set `justMyCode: false`** (already configured) - Allows stepping into Home Assistant core and asyncio
+2. **Use Step Over (F10)** - To skip over `await` internals
+3. **Watch for task cancellation** - Tasks can be cancelled during shutdown
+4. **Check event loop state** - In Debug Console: `hass.loop.is_running()`
+
+**Example debugging session:**
+
+```python
+# coordinator.py:337
+async def _async_update_data(self) -> dict[str, Any]:
+    """Update data via library."""
+    # Set breakpoint here ←
+    _LOGGER.debug("Updating Adaptive Cover data")
+
+    # F10 to step through
+    sun_azimuth = self.hass.states.get(self._sun_azimuth_sensor).state
+
+    # F11 to step into calculate_position()
+    position = await self._cover.calculate_position(...)
+
+    # Inspect variables in Debug panel:
+    # - self._config_entry.options
+    # - sun_azimuth
+    # - position
+```
+
+##### Debug Panel Features
+
+**Variables:**
+- Expand `self` to inspect coordinator state
+- Expand `self._config_entry.options` to see configuration
+- Hover over variables in editor to see values
+
+**Watch Expressions:**
+Add expressions to monitor:
+- `self._manual_override` - Check override state
+- `self._last_position` - Last calculated position
+- `self.hass.states.get('sun.sun')` - Sun entity state
+
+**Call Stack:**
+- See the full async call chain
+- Click frames to navigate context
+- Useful for understanding event flow
+
+**Debug Console:**
+Execute code in current context:
+```python
+# Check entity states
+self.hass.states.get('sun.sun').attributes
+
+# Test calculations
+await self._cover.calculate_position(...)
+
+# Inspect coordinator data
+self.data
+```
+
+#### Running Tests from VS Code
+
+##### Test Explorer
+
+1. Open Test Explorer (beaker icon in sidebar)
+2. Wait for test discovery (finds all 172 tests)
+3. Click play icon to run individual tests or test files
+4. Click debug icon to debug with breakpoints
+5. View test results inline (✓ pass, ✗ fail)
+
+##### Test Discovery
+
+Tests are automatically discovered from `tests/` directory:
+- **Auto-discover on save** - Enabled for fast iteration
+- **Pattern:** `test_*.py` files
+- **Framework:** pytest with pytest-asyncio
+
+If tests don't appear:
+1. Open Command Palette (Cmd+Shift+P)
+2. Run "Python: Discover Tests"
+3. Check Output → Python Test Log for errors
+
+##### Running Specific Tests
+
+**From Test Explorer:**
+- Click individual test to run
+- Right-click test file → "Run Test" or "Debug Test"
+
+**From Editor:**
+- Hover over test function name
+- Click "Run Test" or "Debug Test" CodeLens
+
+**From Terminal:**
+```bash
+# Single test
+python -m pytest tests/test_calculation.py::test_gamma_angle -v
+
+# Test pattern
+python -m pytest tests/ -k "gamma" -v
+
+# Test file
+python -m pytest tests/test_calculation.py -v
+```
+
+#### Development Tasks
+
+Access tasks via Terminal → Run Task (or Cmd+Shift+P → "Tasks: Run Task"):
+
+| Task | Description | Keyboard Shortcut |
+|------|-------------|-------------------|
+| **Run Home Assistant on port 8123** | Start development server | - |
+| **Lint with Ruff** | Run linting with click-to-navigate errors | - |
+| **Run All Tests** | Execute full test suite (172 tests) | - |
+| **Run Tests with Coverage** | Generate coverage reports (HTML + terminal) | - |
+| **Format Code** | Auto-format all files with ruff | - |
+| **Check Pre-commit Hooks** | Validate pre-commit configuration | - |
+| **Setup Development Environment** | Run `scripts/setup` | - |
+
+**Task Features:**
+- **Problem matchers** - Click errors to jump to code
+- **Instance limits** - Prevents multiple Home Assistant instances
+- **Dedicated panels** - Separate terminal for each task
+
+#### Terminal Integration
+
+The integrated terminal is pre-configured for development:
+
+**Automatic venv activation:**
+- New terminals automatically activate `venv/`
+- Prompt shows `(venv)` when active
+
+**PYTHONPATH configuration:**
+- Includes `custom_components/` directory
+- Enables imports: `from custom_components.adaptive_cover_pro import coordinator`
+
+**Verify setup:**
+```bash
+# Check venv
+which python
+# Should output: /Users/jasonrhubottom/Repositories/adaptive-cover/venv/bin/python
+
+# Check PYTHONPATH
+echo $PYTHONPATH
+# Should include: .../custom_components
+
+# Test import
+python -c "from custom_components.adaptive_cover_pro import coordinator"
+# Should succeed without errors
+```
+
+#### Workspace Settings Overview
+
+The workspace includes optimized settings for development:
+
+**Code Quality:**
+- Ruff for linting and formatting (matches pre-commit hooks)
+- Format on save enabled for Python files
+- Auto-fix and organize imports on save
+- Inline error highlighting with Error Lens extension
+
+**Python Configuration:**
+- Python 3.11+ from `venv/bin/python`
+- IntelliSense with `custom_components/` in analysis path
+- Basic type checking enabled
+
+**Test Configuration:**
+- Pytest framework with auto-discovery
+- Test discovery on save
+- `-v --no-cov` flags for interactive testing (faster)
+
+**Performance Optimizations:**
+- Excludes venv, caches, coverage from search and file watcher
+- Limits test discovery to `tests/` directory only
+
+#### Troubleshooting VS Code Debugging
+
+##### Breakpoints Not Hit
+
+**Symptoms:** Breakpoint shows gray circle, never triggers
+
+**Solutions:**
+1. **Check Python interpreter:**
+   - Open Command Palette (Cmd+Shift+P)
+   - "Python: Select Interpreter"
+   - Choose `venv/bin/python`
+
+2. **Verify PYTHONPATH:**
+   - Debug Console: `import sys; print(sys.path)`
+   - Should include `.../custom_components`
+
+3. **Check justMyCode setting:**
+   - Verify `"justMyCode": false` in launch.json
+   - Required for stepping into Home Assistant core
+
+4. **Rebuild caches:**
+   - Delete `__pycache__/` directories
+   - Delete `.pytest_cache/`
+   - Restart VS Code
+
+##### Module Not Found Errors
+
+**Symptoms:** `ModuleNotFoundError: No module named 'custom_components'`
+
+**Solutions:**
+1. **Check PYTHONPATH in launch config:**
+   ```json
+   "env": {
+     "PYTHONPATH": "${workspaceFolder}/custom_components"
+   }
+   ```
+
+2. **Verify workspace folder:**
+   - Open Command Palette
+   - "File: Open Folder"
+   - Ensure `/Users/jasonrhubottom/Repositories/adaptive-cover` is the workspace root
+
+3. **Check terminal PYTHONPATH:**
+   ```bash
+   echo $PYTHONPATH
+   # Should include custom_components path
+   ```
+
+##### Debugger Slow or Hanging
+
+**Symptoms:** Debugger takes forever to start or step through code
+
+**Solutions:**
+1. **Disable coverage during debugging:**
+   - Use `--no-cov` flag (already configured in launch.json)
+
+2. **Enable justMyCode (for faster debugging):**
+   - If you don't need to step into Home Assistant core:
+   ```json
+   "justMyCode": true
+   ```
+
+3. **Limit test scope:**
+   - Use "Debug Current Test File" instead of "Debug All Tests"
+   - Use "Debug Specific Test" with `-k` pattern
+
+4. **Check for infinite loops:**
+   - Review recent code changes
+   - Check coordinator update logic
+
+##### Tests Not Discovered
+
+**Symptoms:** Test Explorer shows "No tests discovered"
+
+**Solutions:**
+1. **Check Python interpreter:**
+   - Must be `venv/bin/python` with pytest installed
+
+2. **Verify pytest settings:**
+   - Check `.vscode/settings.json` has `python.testing.pytestEnabled: true`
+   - Check `python.testing.pytestArgs` includes `"tests"`
+
+3. **Check for syntax errors:**
+   - Open test files and check for linting errors
+   - Run `python -m pytest tests/ --collect-only` in terminal
+
+4. **Force test discovery:**
+   - Command Palette → "Python: Discover Tests"
+   - Check Output → Python Test Log
+
+5. **Reinstall test dependencies:**
+   ```bash
+   source venv/bin/activate
+   pip install -e ".[test]"
+   ```
+
+##### Ruff Not Working
+
+**Symptoms:** No linting errors shown, format on save doesn't work
+
+**Solutions:**
+1. **Check Ruff extension installed:**
+   - Extensions → Search "charliermarsh.ruff"
+   - Install if missing
+
+2. **Verify Ruff path:**
+   ```bash
+   source venv/bin/activate
+   which ruff
+   # Should output: .../venv/bin/ruff
+   ```
+
+3. **Check settings.json:**
+   ```json
+   "ruff.enable": true,
+   "ruff.path": ["${workspaceFolder}/venv/bin/ruff"]
+   ```
+
+4. **Reload window:**
+   - Command Palette → "Developer: Reload Window"
+
+#### Advanced Debugging Tips
+
+##### Conditional Breakpoints
+
+Set breakpoints that only trigger when a condition is true:
+
+1. Right-click breakpoint → "Edit Breakpoint"
+2. Choose "Expression"
+3. Enter condition:
+   ```python
+   # Break only when temperature is low
+   temp < 18
+
+   # Break only for specific cover
+   self._config_entry.entry_id == "abc123"
+
+   # Break only during manual override
+   self._manual_override is True
+   ```
+
+##### Logpoints
+
+Log messages without stopping execution:
+
+1. Right-click gutter → "Add Logpoint"
+2. Enter message with expressions in braces:
+   ```
+   Position calculated: {position}, Sun azimuth: {sun_azimuth}
+   ```
+3. Messages appear in Debug Console without pausing
+
+##### Watch Expressions
+
+Monitor values that change during execution:
+
+**Common watch expressions:**
+```python
+# Coordinator state
+self._manual_override
+self._last_position
+self._last_update
+
+# Cover state
+self.hass.states.get('cover.living_room_blind').state
+self.hass.states.get('cover.living_room_blind').attributes['current_position']
+
+# Sun state
+self.hass.states.get('sun.sun').attributes['azimuth']
+self.hass.states.get('sun.sun').attributes['elevation']
+
+# Config options
+self._config_entry.options['window_azimuth']
+self._config_entry.options['climate_mode_enabled']
+```
+
+##### Exception Breakpoints
+
+Break on all exceptions or specific exception types:
+
+1. Open Run and Debug view
+2. Click "Breakpoints" section
+3. Check "Raised Exceptions" or "Uncaught Exceptions"
+4. Or right-click → "Add Exception Breakpoint" for specific type
+
+**Useful for:**
+- Catching errors in async code
+- Finding silent failures
+- Debugging state validation issues
+
+##### Debug Console Commands
+
+Execute Python code in the current debug context:
+
+```python
+# Inspect Home Assistant state
+self.hass.states.async_all()
+
+# Check specific entity
+state = self.hass.states.get('sun.sun')
+print(state.state, state.attributes)
+
+# Test coordinator methods
+await self._async_update_data()
+
+# Simulate state change
+self.hass.states.async_set('sun.sun', 'above_horizon', {'azimuth': 180})
+
+# Check event listeners
+self.hass.bus.async_listeners()
+```
+
+#### Quick Reference
+
+##### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| **F5** | Start debugging / Continue |
+| **Shift+F5** | Stop debugging |
+| **Cmd+Shift+F5** | Restart debugging |
+| **F9** | Toggle breakpoint |
+| **F10** | Step over |
+| **F11** | Step into |
+| **Shift+F11** | Step out |
+| **Cmd+K Cmd+I** | Show hover info |
+| **Cmd+Shift+P** | Command Palette |
+
+##### Common Commands
+
+| Command | Purpose |
+|---------|---------|
+| **Python: Select Interpreter** | Choose venv Python |
+| **Python: Discover Tests** | Refresh test list |
+| **Tasks: Run Task** | Execute development task |
+| **Developer: Reload Window** | Restart VS Code window |
+| **Python: Clear Cache** | Clear IntelliSense cache |
+
+##### File Locations
+
+| Path | Purpose |
+|------|---------|
+| `.vscode/launch.json` | Debug configurations |
+| `.vscode/settings.json` | Workspace settings |
+| `.vscode/tasks.json` | Development tasks |
+| `.vscode/extensions.json` | Recommended extensions |
+| `venv/bin/python` | Python interpreter |
+| `tests/` | Test suite (172 tests) |
+| `config/` | Development HA instance |
 
 ## Architecture Notes
 
