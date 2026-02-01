@@ -148,6 +148,17 @@ git branch -d feature/my-new-feature
 git push origin --delete feature/my-new-feature
 ```
 
+## Commit Message Guidelines
+
+**CRITICAL:** Git commits must NOT include Claude attribution:
+- ❌ NEVER add `Co-Authored-By: Claude` lines to commit messages
+- ❌ NEVER add `Generated with Claude Code` to commit messages
+- ✅ Commit messages should only describe the changes made
+
+This applies to ALL commits (regular commits, merge commits, etc.). Claude attribution should NOT appear in the git history.
+
+**Note:** Release notes are also affected by this policy - see the Release Process section below for specific guidance on release notes formatting.
+
 ### Release
 ```bash
 ./scripts/release              # Create a release (interactive)

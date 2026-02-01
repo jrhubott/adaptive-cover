@@ -634,9 +634,6 @@ Download \`adaptive_cover_pro.zip\` from the assets below and extract to your \`
 
 ## Next Steps
 If testing is successful, a production release will follow.
-
----
-🤖 Generated with Claude Code
 EOF
     else
         cat << EOF
@@ -670,9 +667,6 @@ Full documentation: https://github.com/jrhubott/adaptive-cover
 
 ## Changelog
 See commit history for detailed changes.
-
----
-🤖 Generated with Claude Code
 EOF
     fi
 }
@@ -680,8 +674,8 @@ EOF
 filter_coauthored_lines() {
     local text="$1"
 
-    # Remove Co-Authored-By lines per CLAUDE.md requirements
-    echo "$text" | grep -v "Co-Authored-By:" || true
+    # Remove Co-Authored-By lines and Claude attribution per CLAUDE.md requirements
+    echo "$text" | grep -v -e "Co-Authored-By:" -e "Generated with Claude Code" -e "🤖" || true
 }
 
 open_editor_for_notes() {
