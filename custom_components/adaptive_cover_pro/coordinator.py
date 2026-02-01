@@ -30,7 +30,10 @@ try:
 except ImportError:
     # Fallback for older Home Assistant versions
     EventStateChangedData = dict  # type: ignore[misc,assignment]
-from homeassistant.helpers.event import async_track_point_in_time
+from homeassistant.helpers.event import (
+    async_track_point_in_time,
+    async_track_time_interval,
+)
 from homeassistant.helpers.template import state_attr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -109,6 +112,9 @@ from .const import (
     DOMAIN,
     ControlStatus,
     LOGGER,
+    MAX_POSITION_RETRIES,
+    POSITION_CHECK_INTERVAL_MINUTES,
+    POSITION_TOLERANCE_PERCENT,
 )
 from .helpers import (
     get_datetime_from_str,
@@ -203,11 +209,21 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             "covers_controlled": 0,
         }
 
+        # Position verification tracking
+        self._position_check_interval = None  # async_track_time_interval listener
+        self._retry_counts: dict[str, int] = {}  # entity_id → retry count
+        self._last_verification: dict[str, dt.datetime] = {}  # entity_id → last check time
+        self._check_interval_minutes = POSITION_CHECK_INTERVAL_MINUTES
+        self._position_tolerance = POSITION_TOLERANCE_PERCENT
+        self._max_retries = MAX_POSITION_RETRIES
+
     async def async_config_entry_first_refresh(self) -> None:
         """Config entry first refresh."""
         self.first_refresh = True
         await super().async_config_entry_first_refresh()
         self.logger.debug("Config entry first refresh")
+        # Start position verification after first refresh
+        self._start_position_verification()
 
     async def async_timed_refresh(self, event) -> None:
         """Control state at end time."""
@@ -388,7 +404,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 "start": start,
                 "end": end,
                 "control": self.control_method,
-                "sun_motion": normal_cover.valid,
+                "sun_motion": normal_cover.direct_sun_valid,
                 "manual_override": self.manager.binary_cover_manual,
                 "manual_list": self.manager.manual_controlled,
             },
@@ -1044,6 +1060,112 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     @return_to_default_toggle.setter
     def return_to_default_toggle(self, value):
         self._return_to_default_toggle = value
+
+    async def async_periodic_position_check(self, now: dt.datetime) -> None:
+        """Periodically verify cover positions match calculated positions."""
+        # Skip if not within operational time window
+        if not self.check_adaptive_time:
+            return
+
+        # Skip if automatic control is disabled
+        if not self.switch_enabled:
+            return
+
+        for entity_id in self._entities:
+            await self._verify_entity_position(entity_id, now)
+
+    async def _verify_entity_position(self, entity_id: str, now: dt.datetime) -> None:
+        """Verify a single entity's position and retry if needed."""
+        # Skip if manual override active
+        if self.manager.is_cover_manual(entity_id):
+            self._reset_retry_count(entity_id)
+            return
+
+        # Skip if currently waiting for target (move in progress)
+        if self.wait_for_target.get(entity_id, False):
+            return
+
+        # Get target position (the position we last sent to this cover)
+        target_position = self.target_call.get(entity_id)
+        if target_position is None:
+            # No command has been sent yet, nothing to verify
+            self.logger.debug("No target position set for %s, skipping verification", entity_id)
+            return
+
+        # Get actual position
+        actual_position = self._get_current_position(entity_id)
+
+        if actual_position is None:
+            self.logger.debug("Cannot verify position for %s: position unavailable", entity_id)
+            return
+
+        # Update last verification time
+        self._last_verification[entity_id] = now if isinstance(now, dt.datetime) else dt.datetime.now()
+
+        # Check if positions match within tolerance
+        # Compare to target_call (what we sent), not self.state (current calculation)
+        # This prevents false mismatches when sun moves between command and verification
+        position_delta = abs(target_position - actual_position)
+
+        if position_delta <= self._position_tolerance:
+            # Position is correct, reset retry count
+            self._reset_retry_count(entity_id)
+            return
+
+        # Position mismatch detected - cover failed to reach target we sent
+        retry_count = self._retry_counts.get(entity_id, 0)
+
+        if retry_count >= self._max_retries:
+            self.logger.warning(
+                "Max retries exceeded for %s. Position mismatch: target=%s, actual=%s, delta=%s",
+                entity_id,
+                target_position,
+                actual_position,
+                position_delta,
+            )
+            return
+
+        # Increment retry count and reposition
+        self._retry_counts[entity_id] = retry_count + 1
+        self.logger.info(
+            "Position mismatch detected for %s (attempt %d/%d): target=%s, actual=%s, delta=%s. Repositioning...",
+            entity_id,
+            retry_count + 1,
+            self._max_retries,
+            target_position,
+            actual_position,
+            position_delta,
+        )
+
+        # Resend the same target position
+        # Note: If sun has moved and changed the calculated position, the normal
+        # update cycle will handle that separately. We only retry the last command.
+        await self.async_set_position(entity_id, target_position)
+
+    def _reset_retry_count(self, entity_id: str) -> None:
+        """Reset retry count for an entity."""
+        if entity_id in self._retry_counts:
+            del self._retry_counts[entity_id]
+
+    def _start_position_verification(self) -> None:
+        """Start periodic position verification."""
+        if self._position_check_interval is not None:
+            return  # Already started
+
+        interval = dt.timedelta(minutes=self._check_interval_minutes)
+        self._position_check_interval = async_track_time_interval(
+            self.hass,
+            self.async_periodic_position_check,
+            interval,
+        )
+        self.logger.debug("Started periodic position verification (interval: %s)", interval)
+
+    def _stop_position_verification(self) -> None:
+        """Stop periodic position verification."""
+        if self._position_check_interval:
+            self._position_check_interval()
+            self._position_check_interval = None
+            self.logger.debug("Stopped periodic position verification")
 
 
 class AdaptiveCoverManager:

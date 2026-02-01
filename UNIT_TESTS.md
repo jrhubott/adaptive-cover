@@ -7,8 +7,8 @@ This document describes the unit test structure, organization, and coverage for 
 The test suite provides comprehensive coverage of the core calculation logic and helper functions. Tests are organized by module and use pytest with extensive fixtures for mocking Home Assistant dependencies.
 
 **Current Status:**
-- **Total Tests:** 172
-- **Overall Coverage:** 30% (due to platform files not yet tested)
+- **Total Tests:** 178
+- **Overall Coverage:** 28% (due to platform files not yet tested)
 - **calculation.py Coverage:** 91% (primary target achieved)
 
 ## Test Organization
@@ -18,7 +18,7 @@ The test suite provides comprehensive coverage of the core calculation logic and
 ```
 tests/
 ├── conftest.py                 # Shared fixtures and configuration
-├── test_calculation.py         # Calculation logic (129 tests, 91% coverage)
+├── test_calculation.py         # Calculation logic (135 tests, 91% coverage)
 ├── test_helpers.py            # Helper functions (29 tests, 100% coverage)
 └── test_inverse_state.py      # Inverse state behavior (14 tests, 100% coverage)
 ```
@@ -32,9 +32,9 @@ Tests use pytest markers to categorize:
 
 ## Test Coverage by Module
 
-### calculation.py (91% coverage, 129 tests)
+### calculation.py (91% coverage, 135 tests)
 
-**Phase 1: AdaptiveGeneralCover Properties (40 tests)**
+**Phase 1: AdaptiveGeneralCover Properties (46 tests)**
 
 Tests for base cover class properties used by all cover types:
 
@@ -75,6 +75,14 @@ Tests for base cover class properties used by all cover types:
 - `test_is_sun_in_blind_spot_outside_area` - Sun outside blind spot azimuth range
 - `test_is_sun_in_blind_spot_disabled` - Blind spot detection disabled
 - `test_is_sun_in_blind_spot_none_values` - Blind spot with None configuration
+
+**Direct Sun Validity (6 tests):**
+- `test_direct_sun_valid_all_conditions_met` - All conditions met: in FOV, above horizon, before sunset, no blind spot
+- `test_direct_sun_valid_after_sunset` - Returns False after sunset (reproduces End Sun time bug scenario)
+- `test_direct_sun_valid_in_blind_spot` - Returns False when sun in blind spot (even if in FOV)
+- `test_direct_sun_valid_outside_fov` - Returns False when sun outside field of view
+- `test_direct_sun_valid_before_sunrise` - Returns False before sunrise time
+- `test_direct_sun_valid_with_sunset_offset` - Respects sunset offset configuration
 
 **Default Position Logic:**
 - `test_default_position_before_sunset` - Returns h_def before sunset

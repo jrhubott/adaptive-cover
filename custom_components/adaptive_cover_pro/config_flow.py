@@ -123,13 +123,13 @@ OPTIONS = vol.Schema(
                 min=1, max=100, step=1, mode="slider", unit_of_measurement="%"
             )
         ),
-        vol.Optional(CONF_ENABLE_MAX_POSITION, default=False): bool,
+        vol.Optional(CONF_ENABLE_MAX_POSITION, default=False): selector.BooleanSelector(),
         vol.Optional(CONF_MIN_POSITION): selector.NumberSelector(
             selector.NumberSelectorConfig(
                 min=0, max=99, step=1, mode="slider", unit_of_measurement="%"
             )
         ),
-        vol.Optional(CONF_ENABLE_MIN_POSITION, default=False): bool,
+        vol.Optional(CONF_ENABLE_MIN_POSITION, default=False): selector.BooleanSelector(),
         vol.Optional(CONF_MIN_ELEVATION): selector.NumberSelector(
             selector.NumberSelectorConfig(
                 min=0, max=90, step=1, mode="slider", unit_of_measurement="°"

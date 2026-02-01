@@ -90,7 +90,15 @@ If you're interested in contributing to this project, please see the **[Developm
   - Optional return to default position when automatic control is disabled
   - Set start time to prevent opening blinds while you are asleep
   - Set minimum interval time between position changes
-  - set minimum percentage change
+  - Set minimum percentage change
+  - **Automatic Position Verification** (built-in reliability feature)
+    - Periodically verifies covers reached the positions we sent them to (every 2 minutes)
+    - Automatically retries failed position commands (up to 3 attempts)
+    - Detects position mismatches between target and actual position (3% tolerance)
+    - Respects manual override detection and skips during active moves
+    - Separate from normal position updates - only retries failed commands, doesn't chase sun movement
+    - No configuration required - works automatically when automatic control is enabled
+    - Diagnostic sensors available for troubleshooting cover movement issues
 
 - **Diagnostic Sensors** (Optional, disabled by default)
   - Real-time troubleshooting sensors to understand integration behavior
@@ -100,6 +108,7 @@ If you're interested in contributing to this project, please see the **[Developm
     - Calculated position (before adjustments)
     - Last cover action (tracks most recent cover action with full details)
   - Priority 1 sensors (disabled by default, enable individually):
+    - Position verification tracking (last check time, retry counts, mismatch detection)
     - Active temperature (climate mode only)
     - Climate conditions (climate mode only)
     - Time window status
@@ -398,6 +407,20 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 | Offset Sunrise time           | 0       |       | Additional minutes before/after sunrise                                                                  |
 | Inverse State                 | False   |       | Calculates inverse state for covers fully closed at 100%                                                 |
 
+#### Position Limits: Min and Max Position
+
+The Minimal Position and Maximum Position settings create boundaries for automatic cover control. Each limit has an associated toggle that controls **when** the limit applies:
+
+**Apply min/max only during sun tracking** (toggles):
+- **Unchecked (default, recommended)**: The position limit applies **ALL THE TIME** - during sun tracking, default position, climate modes, and all other states. The cover will never go below the minimum or above the maximum value.
+- **Checked (advanced)**: The position limit **ONLY applies when the sun is directly in front of the window** during active sun tracking. During default/fallback states (sun behind window, outside tracking hours, etc.), the cover can go below minimum or above maximum values.
+
+**Most users should leave these toggles UNCHECKED** for consistent protection and predictable behavior. The "checked" option is for advanced users who want limits to apply only during active sun tracking, allowing more flexibility during other times.
+
+**Common use cases:**
+- **Minimum Position** (e.g., 20%): Prevents cover from fully closing, maintains some natural light, protects from jamming at bottom
+- **Maximum Position** (e.g., 80%): Prevents cover from fully opening, maintains some privacy/shade, protects from jamming at top
+
 ### Vertical
 
 | Variables         | Default | Range | Description                                                                                 |
@@ -510,12 +533,15 @@ These sensors are created when diagnostics are enabled in automation settings. T
 | `sensor.{device_name}_control_status` | Enabled | Shows why covers aren't moving: `active`, `outside_time_window`, `manual_override`, `automatic_control_off`, `sun_not_visible`, etc. |
 | `sensor.{device_name}_calculated_position` | Enabled | Raw calculated position before interpolation/inversion adjustments. |
 | `sensor.{device_name}_last_cover_action` | Enabled | Tracks the most recent cover action: service called, entity controlled, timestamp. Attributes include position sent, threshold used (for open/close-only covers), and whether inverse_state was applied. Useful for debugging. |
+| `sensor.{device_name}_last_position_verification` | Disabled | Timestamp of the last position verification check. Attributes show per-entity verification times. |
+| `sensor.{device_name}_position_verification_retries` | Disabled | Current retry count for position verification (0-3). Attributes show max retries, retries remaining, and per-entity counts. Helps identify covers that repeatedly fail to reach target positions. |
+| `binary_sensor.{device_name}_position_mismatch` | Disabled | Indicates position mismatch between target and actual position (problem class). Attributes show target position sent, actual position per entity, position delta, and retry counts. Useful for troubleshooting cover movement issues. |
 | `sensor.{device_name}_active_temperature` | Disabled | Currently active temperature value (climate mode only). Shows which sensor is used. Enable manually if needed. |
 | `sensor.{device_name}_climate_conditions` | Disabled | Climate mode state (Summer Mode, Winter Mode, Intermediate) with condition flags as attributes (climate mode only). Enable manually if needed. |
 | `sensor.{device_name}_time_window` | Disabled | Time window status (Active/Outside Window) with time details as attributes. Enable manually if needed. |
 | `sensor.{device_name}_sun_validity` | Disabled | Sun validity status (Valid, In Blind Spot, Invalid Elevation) with validation details as attributes. Enable manually if needed. |
 
-**Note:** Priority 1 sensors (last 4) are created disabled by default to reduce entity overhead. Enable them individually in the entity list if needed for troubleshooting.
+**Note:** Priority 1 sensors (last 7) are created disabled by default to reduce entity overhead. Enable them individually in the entity list if needed for troubleshooting.
 
 ![entities](https://github.com/jrhubott/adaptive-cover/blob/main/images/entities.png)
 

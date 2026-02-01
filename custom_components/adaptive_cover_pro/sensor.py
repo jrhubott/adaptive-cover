@@ -160,6 +160,26 @@ async def async_setup_entry(
             )
         )
 
+        # P1: Position Verification sensors (disabled by default)
+        entities.append(
+            AdaptiveCoverLastVerificationSensor(
+                config_entry.entry_id,
+                hass,
+                config_entry,
+                name,
+                coordinator,
+            )
+        )
+        entities.append(
+            AdaptiveCoverRetryCountSensor(
+                config_entry.entry_id,
+                hass,
+                config_entry,
+                name,
+                coordinator,
+            )
+        )
+
         # P1: Advanced diagnostic sensors (disabled by default)
         # Only add climate-specific sensors if climate mode is enabled
         if config_entry.options.get(CONF_CLIMATE_MODE, False):
@@ -739,3 +759,104 @@ class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
             )
 
         return attrs
+
+
+class AdaptiveCoverLastVerificationSensor(AdaptiveCoverAdvancedDiagnosticSensor):
+    """Sensor showing when position was last verified."""
+
+    _attr_entity_registry_enabled_default = False  # P1 sensor
+    _attr_native_unit_of_measurement = ""  # Exclude from logbook
+
+    def __init__(
+        self,
+        config_entry_id: str,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        name: str,
+        coordinator: AdaptiveDataUpdateCoordinator,
+    ):
+        """Initialize the sensor."""
+        super().__init__(
+            config_entry_id,
+            hass,
+            config_entry,
+            name,
+            coordinator,
+            "Last Position Verification",
+            "last_position_verification",
+            None,
+            "mdi:clock-check-outline",
+            None,
+            SensorDeviceClass.TIMESTAMP,
+        )
+
+    @property
+    def native_value(self):
+        """Return last verification time."""
+        # Return the most recent verification time from all entities
+        if not self.coordinator._last_verification:
+            return None
+        return max(self.coordinator._last_verification.values())
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        """Return additional state attributes."""
+        if not self.coordinator._last_verification:
+            return None
+
+        return {
+            "per_entity": {
+                entity_id: time.isoformat()
+                for entity_id, time in self.coordinator._last_verification.items()
+            }
+        }
+
+
+class AdaptiveCoverRetryCountSensor(AdaptiveCoverAdvancedDiagnosticSensor):
+    """Sensor showing current retry count for position verification."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_registry_enabled_default = False  # P1 sensor
+    _attr_native_unit_of_measurement = ""  # Exclude from logbook
+
+    def __init__(
+        self,
+        config_entry_id: str,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        name: str,
+        coordinator: AdaptiveDataUpdateCoordinator,
+    ):
+        """Initialize the sensor."""
+        super().__init__(
+            config_entry_id,
+            hass,
+            config_entry,
+            name,
+            coordinator,
+            "Position Verification Retries",
+            "position_verification_retries",
+            None,
+            "mdi:refresh",
+        )
+
+    @property
+    def native_value(self):
+        """Return retry count."""
+        # Return the maximum retry count from all entities
+        if not self.coordinator._retry_counts:
+            return 0
+        return max(self.coordinator._retry_counts.values())
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        """Return additional attributes."""
+        return {
+            "max_retries": self.coordinator._max_retries,
+            "retries_remaining": max(
+                0,
+                self.coordinator._max_retries
+                - max(self.coordinator._retry_counts.values(), default=0),
+            ),
+            "per_entity": dict(self.coordinator._retry_counts),
+        }
