@@ -1085,8 +1085,14 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         if self.wait_for_target.get(entity_id, False):
             return
 
-        # Get positions
-        calculated_position = self.state  # Final calculated position
+        # Get target position (the position we last sent to this cover)
+        target_position = self.target_call.get(entity_id)
+        if target_position is None:
+            # No command has been sent yet, nothing to verify
+            self.logger.debug("No target position set for %s, skipping verification", entity_id)
+            return
+
+        # Get actual position
         actual_position = self._get_current_position(entity_id)
 
         if actual_position is None:
@@ -1097,21 +1103,23 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._last_verification[entity_id] = now if isinstance(now, dt.datetime) else dt.datetime.now()
 
         # Check if positions match within tolerance
-        position_delta = abs(calculated_position - actual_position)
+        # Compare to target_call (what we sent), not self.state (current calculation)
+        # This prevents false mismatches when sun moves between command and verification
+        position_delta = abs(target_position - actual_position)
 
         if position_delta <= self._position_tolerance:
             # Position is correct, reset retry count
             self._reset_retry_count(entity_id)
             return
 
-        # Position mismatch detected
+        # Position mismatch detected - cover failed to reach target we sent
         retry_count = self._retry_counts.get(entity_id, 0)
 
         if retry_count >= self._max_retries:
             self.logger.warning(
-                "Max retries exceeded for %s. Position mismatch: calculated=%s, actual=%s, delta=%s",
+                "Max retries exceeded for %s. Position mismatch: target=%s, actual=%s, delta=%s",
                 entity_id,
-                calculated_position,
+                target_position,
                 actual_position,
                 position_delta,
             )
@@ -1120,17 +1128,19 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         # Increment retry count and reposition
         self._retry_counts[entity_id] = retry_count + 1
         self.logger.info(
-            "Position mismatch detected for %s (attempt %d/%d): calculated=%s, actual=%s, delta=%s. Repositioning...",
+            "Position mismatch detected for %s (attempt %d/%d): target=%s, actual=%s, delta=%s. Repositioning...",
             entity_id,
             retry_count + 1,
             self._max_retries,
-            calculated_position,
+            target_position,
             actual_position,
             position_delta,
         )
 
-        # Send position command
-        await self.async_set_position(entity_id, calculated_position)
+        # Resend the same target position
+        # Note: If sun has moved and changed the calculated position, the normal
+        # update cycle will handle that separately. We only retry the last command.
+        await self.async_set_position(entity_id, target_position)
 
     def _reset_retry_count(self, entity_id: str) -> None:
         """Reset retry count for an entity."""

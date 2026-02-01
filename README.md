@@ -92,10 +92,11 @@ If you're interested in contributing to this project, please see the **[Developm
   - Set minimum interval time between position changes
   - Set minimum percentage change
   - **Automatic Position Verification** (built-in reliability feature)
-    - Periodically verifies covers reach their target positions (every 2 minutes)
+    - Periodically verifies covers reached the positions we sent them to (every 2 minutes)
     - Automatically retries failed position commands (up to 3 attempts)
-    - Detects position mismatches (3% tolerance)
-    - Respects manual override detection
+    - Detects position mismatches between target and actual position (3% tolerance)
+    - Respects manual override detection and skips during active moves
+    - Separate from normal position updates - only retries failed commands, doesn't chase sun movement
     - No configuration required - works automatically when automatic control is enabled
     - Diagnostic sensors available for troubleshooting cover movement issues
 
@@ -520,7 +521,7 @@ These sensors are created when diagnostics are enabled in automation settings. T
 | `sensor.{device_name}_last_cover_action` | Enabled | Tracks the most recent cover action: service called, entity controlled, timestamp. Attributes include position sent, threshold used (for open/close-only covers), and whether inverse_state was applied. Useful for debugging. |
 | `sensor.{device_name}_last_position_verification` | Disabled | Timestamp of the last position verification check. Attributes show per-entity verification times. |
 | `sensor.{device_name}_position_verification_retries` | Disabled | Current retry count for position verification (0-3). Attributes show max retries, retries remaining, and per-entity counts. Helps identify covers that repeatedly fail to reach target positions. |
-| `binary_sensor.{device_name}_position_mismatch` | Disabled | Indicates position mismatch between calculated and actual position (problem class). Attributes show calculated position, actual position per entity, position delta, and retry counts. Useful for troubleshooting cover movement issues. |
+| `binary_sensor.{device_name}_position_mismatch` | Disabled | Indicates position mismatch between target and actual position (problem class). Attributes show target position sent, actual position per entity, position delta, and retry counts. Useful for troubleshooting cover movement issues. |
 | `sensor.{device_name}_active_temperature` | Disabled | Currently active temperature value (climate mode only). Shows which sensor is used. Enable manually if needed. |
 | `sensor.{device_name}_climate_conditions` | Disabled | Climate mode state (Summer Mode, Winter Mode, Intermediate) with condition flags as attributes (climate mode only). Enable manually if needed. |
 | `sensor.{device_name}_time_window` | Disabled | Time window status (Active/Outside Window) with time details as attributes. Enable manually if needed. |

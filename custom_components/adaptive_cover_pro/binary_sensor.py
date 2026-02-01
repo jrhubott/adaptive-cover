@@ -160,16 +160,17 @@ class AdaptiveCoverPositionMismatchSensor(
     @property
     def is_on(self) -> bool:
         """Return True if position mismatch detected."""
-        # Check if any entity has a position mismatch
-        calculated = self.coordinator.state
-
+        # Check if any entity has a position mismatch between target and actual
         for entity_id in self.coordinator._entities:
-            actual = self.coordinator._get_current_position(entity_id)
+            target = self.coordinator.target_call.get(entity_id)
+            if target is None:
+                continue  # No command sent yet
 
+            actual = self.coordinator._get_current_position(entity_id)
             if actual is None:
                 continue
 
-            delta = abs(calculated - actual)
+            delta = abs(target - actual)
             if delta > self.coordinator._position_tolerance:
                 return True
 
@@ -178,19 +179,20 @@ class AdaptiveCoverPositionMismatchSensor(
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return additional attributes."""
-        calculated = self.coordinator.state
         attrs = {
-            "calculated_position": calculated,
             "tolerance": self.coordinator._position_tolerance,
         }
 
         # Add per-entity details
         entity_details = {}
         for entity_id in self.coordinator._entities:
+            target = self.coordinator.target_call.get(entity_id)
             actual = self.coordinator._get_current_position(entity_id)
-            if actual is not None:
-                delta = abs(calculated - actual)
+
+            if target is not None and actual is not None:
+                delta = abs(target - actual)
                 entity_details[entity_id] = {
+                    "target_position": target,
                     "actual_position": actual,
                     "position_delta": delta,
                     "mismatch": delta > self.coordinator._position_tolerance,
