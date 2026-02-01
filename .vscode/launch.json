@@ -1,0 +1,103 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Home Assistant",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "homeassistant",
+      "args": [
+        "--debug",
+        "-c",
+        "config"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/custom_components"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-in-terminal"],
+      "python": "${workspaceFolder}/venv/bin/python",
+      "preLaunchTask": "Stop Home Assistant",
+      // NOTE: This configuration matches scripts/develop behavior:
+      // - Stops any running HA instance first (preLaunchTask)
+      // - Uses venv Python interpreter (python field above)
+      // - Sets PYTHONPATH to custom_components (env.PYTHONPATH)
+      // - Runs with --debug flag (args)
+      // - Uses config/ directory (args: -c config)
+      // We use "module": "homeassistant" instead of running the script
+      // directly because VS Code needs to attach the debugger to the
+      // Python process for breakpoints to work.
+    },
+    {
+      "name": "Debug Current Test File",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "${file}",
+        "-v",
+        "--no-cov"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"],
+      "python": "${workspaceFolder}/venv/bin/python"
+    },
+    {
+      "name": "Debug All Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/",
+        "-v",
+        "--no-cov"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"],
+      "python": "${workspaceFolder}/venv/bin/python"
+    },
+    {
+      "name": "Debug Specific Test",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/",
+        "-v",
+        "--no-cov",
+        "-k",
+        "${input:testName}"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"],
+      "python": "${workspaceFolder}/venv/bin/python"
+    },
+    {
+      "name": "Debug calculation.py Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/test_calculation.py",
+        "-v",
+        "--no-cov"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "purpose": ["debug-test"],
+      "python": "${workspaceFolder}/venv/bin/python"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "testName",
+      "type": "promptString",
+      "description": "Enter test name or pattern (e.g., 'test_gamma' or 'vertical')",
+      "default": ""
+    }
+  ]
+}

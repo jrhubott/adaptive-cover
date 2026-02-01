@@ -1,0 +1,31 @@
+{
+  "recommendations": [
+    // Critical Extensions (Python Development)
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+
+    // Home Assistant Development
+    "keesschollaart.vscode-home-assistant",
+
+    // YAML & JSON Support
+    "redhat.vscode-yaml",
+    "esbenp.prettier-vscode",
+
+    // Jupyter Notebooks (for notebooks/test_env.ipynb)
+    "ms-toolsai.jupyter",
+
+    // Git Integration
+    "eamodio.gitlens",
+
+    // Developer Experience
+    "usernamehw.errorlens"
+  ],
+  "unwantedRecommendations": [
+    // We use Ruff instead of these
+    "ms-python.pylint",
+    "ms-python.flake8",
+    "ms-python.black-formatter"
+  ]
+}

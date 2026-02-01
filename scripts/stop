@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "Checking for running Home Assistant instances..."
+
+# Find all running hass processes with our config directory
+PIDS=$(ps aux | grep "[h]ass --config ${PWD}/config" | awk '{print $2}')
+
+if [ -z "$PIDS" ]; then
+    echo "No running Home Assistant instances found."
+    exit 0
+fi
+
+echo "Found running instance(s): $PIDS"
+echo "Stopping Home Assistant gracefully..."
+
+# Send SIGTERM for graceful shutdown
+for PID in $PIDS; do
+    echo "  Stopping PID $PID..."
+    kill -TERM "$PID" 2>/dev/null || echo "  (already stopped)"
+done
+
+# Wait for processes to stop (max 10 seconds)
+echo "Waiting for shutdown..."
+for i in {1..10}; do
+    REMAINING=$(ps aux | grep "[h]ass --config ${PWD}/config" | awk '{print $2}')
+    if [ -z "$REMAINING" ]; then
+        echo "✓ Home Assistant stopped successfully"
+        exit 0
+    fi
+    sleep 1
+done
+
+# Force kill if still running
+echo "Process not stopping gracefully, forcing..."
+REMAINING=$(ps aux | grep "[h]ass --config ${PWD}/config" | awk '{print $2}')
+if [ -n "$REMAINING" ]; then
+    for PID in $REMAINING; do
+        kill -9 "$PID" 2>/dev/null || true
+    done
+    echo "✓ Home Assistant stopped (forced)"
+else
+    echo "✓ Home Assistant stopped successfully"
+fi

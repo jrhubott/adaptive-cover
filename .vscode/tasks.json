@@ -2,10 +2,129 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Stop Home Assistant",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/stop",
+      "problemMatcher": [],
+      "group": "homeassistant",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "close": true
+      }
+    },
+    {
       "label": "Run Home Assistant on port 8123",
       "type": "shell",
-      "command": "scripts/develop",
-      "problemMatcher": []
+      "command": "${workspaceFolder}/scripts/develop",
+      "problemMatcher": [],
+      "group": "homeassistant",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "dependsOn": ["Stop Home Assistant"]
+    },
+    {
+      "label": "Lint with Ruff",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/lint",
+      "problemMatcher": {
+        "owner": "python",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(\\w+):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      },
+      "group": "development",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run All Tests",
+      "type": "shell",
+      "command": "source venv/bin/activate && python -m pytest tests/ -v",
+      "problemMatcher": {
+        "owner": "python",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        }
+      },
+      "group": "testing",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run Tests with Coverage",
+      "type": "shell",
+      "command": "source venv/bin/activate && python -m pytest tests/ --cov=custom_components/adaptive_cover_pro --cov-report=term --cov-report=html",
+      "problemMatcher": [],
+      "group": "testing",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Format Code",
+      "type": "shell",
+      "command": "source venv/bin/activate && ruff format .",
+      "problemMatcher": [],
+      "group": "development",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Check Pre-commit Hooks",
+      "type": "shell",
+      "command": "pre-commit run --all-files",
+      "problemMatcher": {
+        "owner": "python",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(\\w+):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      },
+      "group": "development",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Setup Development Environment",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/setup",
+      "problemMatcher": [],
+      "group": "setup",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
     }
   ]
 }

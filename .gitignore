@@ -8,7 +8,11 @@ __pycache__
 
 # misc
 .coverage
-.vscode
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
 coverage.xml
 
 
