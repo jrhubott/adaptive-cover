@@ -766,6 +766,8 @@ class AdaptiveCoverLastVerificationSensor(AdaptiveCoverAdvancedDiagnosticSensor)
 
     _attr_entity_registry_enabled_default = False  # P1 sensor
     _attr_native_unit_of_measurement = ""  # Exclude from logbook
+    _attr_should_poll = False  # Prevent unnecessary state polling
+    _attr_has_entity_name = True  # Modern entity naming (HA 2024.5+)
 
     def __init__(
         self,
