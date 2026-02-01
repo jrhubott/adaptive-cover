@@ -443,6 +443,11 @@ Config is stored in two layers:
 **`config_entry.options`** (configurable):
 - Window azimuth, field of view, elevation limits
 - Cover-specific dimensions (height, length, slat properties)
+- Position limits:
+  - `min_position` / `max_position` - Absolute position boundaries (0-99%, 1-100%)
+  - `enable_min_position` / `enable_max_position` - Controls when limits apply:
+    - False (default): Limits always enforced
+    - True: Limits only during direct sun tracking
 - Automation settings (delta position/time, start/end times, manual override)
 - Climate settings (temperature entities/thresholds, presence, weather)
 - Light settings (lux/irradiance entities and thresholds)

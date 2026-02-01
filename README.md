@@ -407,6 +407,20 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 | Offset Sunrise time           | 0       |       | Additional minutes before/after sunrise                                                                  |
 | Inverse State                 | False   |       | Calculates inverse state for covers fully closed at 100%                                                 |
 
+#### Position Limits: Min and Max Position
+
+The Minimal Position and Maximum Position settings create boundaries for automatic cover control. Each limit has an associated toggle that controls **when** the limit applies:
+
+**Apply min/max only during sun tracking** (toggles):
+- **Unchecked (default, recommended)**: The position limit applies **ALL THE TIME** - during sun tracking, default position, climate modes, and all other states. The cover will never go below the minimum or above the maximum value.
+- **Checked (advanced)**: The position limit **ONLY applies when the sun is directly in front of the window** during active sun tracking. During default/fallback states (sun behind window, outside tracking hours, etc.), the cover can go below minimum or above maximum values.
+
+**Most users should leave these toggles UNCHECKED** for consistent protection and predictable behavior. The "checked" option is for advanced users who want limits to apply only during active sun tracking, allowing more flexibility during other times.
+
+**Common use cases:**
+- **Minimum Position** (e.g., 20%): Prevents cover from fully closing, maintains some natural light, protects from jamming at bottom
+- **Maximum Position** (e.g., 80%): Prevents cover from fully opening, maintains some privacy/shade, protects from jamming at top
+
 ### Vertical
 
 | Variables         | Default | Range | Description                                                                                 |
