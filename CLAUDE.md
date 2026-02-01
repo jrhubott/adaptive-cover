@@ -278,21 +278,54 @@ source venv/bin/activate && python -m pytest tests/ -v
 ### Creating Releases
 
 **CRITICAL: Only create releases when explicitly requested by the user.**
+- ❌ NEVER create releases proactively
+- ✅ ONLY create when user explicitly asks
 
-### Version Numbering
+### Release Script: `./scripts/release`
 
-- Use semantic versioning: `MAJOR.MINOR.PATCH`
-- Beta releases: `MAJOR.MINOR.PATCH-beta.N`
-- Update version in `custom_components/adaptive_cover_pro/manifest.json`
+The release script automates version management, git tagging, and GitHub release creation.
 
-### Release Workflow (Automated)
-
-**1. Generate release notes:**
+**Usage:**
 ```bash
+./scripts/release [VERSION_SPEC] [OPTIONS]
+```
+
+### Version Specification
+
+| Spec | Description | Example Result |
+|------|-------------|----------------|
+| `patch` | Increment patch version (X.Y.Z+1) | 2.6.8 → 2.6.9 |
+| `minor` | Increment minor version (X.Y+1.0) | 2.6.8 → 2.7.0 |
+| `major` | Increment major version (X+1.0.0) | 2.6.8 → 3.0.0 |
+| `beta` | Auto-increment beta version | 2.6.8 → 2.6.9-beta.1<br>2.6.8-beta.1 → 2.6.8-beta.2 |
+| `X.Y.Z` | Explicit version number | 2.7.0 (explicit) |
+| `X.Y.Z-beta.N` | Explicit beta version | 2.7.0-beta.5 (explicit) |
+| *(omitted)* | Interactive mode (prompts for choice) | User selects from menu |
+
+**How `beta` works:**
+- If current version is stable (e.g., `2.6.8`) → creates `2.6.9-beta.1` (next patch's first beta)
+- If current version is beta (e.g., `2.6.9-beta.1`) → creates `2.6.9-beta.2` (increment beta number)
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--dry-run` | | Preview operations without executing any changes |
+| `--yes` | `-y` | Skip all confirmation prompts (CI/automation mode) |
+| `--notes FILE` | | Read release notes from specified file |
+| `--auto-notes` | | Use auto-generated template notes only |
+| `--force-branch` | | Skip branch validation (use with caution) |
+| `--help` | `-h` | Show help text and exit |
+
+**Note:** `--editor` option exists in script but should **NOT** be used per CLAUDE.md guidelines. Always use `--notes` parameter instead.
+
+### Common Usage Patterns
+
+**Standard workflow (recommended):**
+```bash
+# 1. Generate release notes
 cat > /tmp/release_notes.md << 'EOF'
 ## 🎯 Release Title
-
-Release description here...
 
 ### ✨ Features
 - Feature 1
@@ -304,41 +337,113 @@ Release description here...
 - Tested with Python 3.11 and 3.12
 - Home Assistant 2024.5.0+
 EOF
+
+# 2. Create release
+./scripts/release patch --notes /tmp/release_notes.md --yes
 ```
 
-**2. Create release:**
+**Quick beta release:**
 ```bash
-# From feature branch (beta)
-./scripts/release beta --notes /tmp/release_notes.md --yes
-
-# From main branch (stable)
-./scripts/release patch --notes /tmp/release_notes.md --yes  # or minor/major
+# Auto-increment beta, skip confirmations, use auto-generated notes
+./scripts/release beta --yes --auto-notes
 ```
 
-The script automatically:
-- Updates version in manifest.json
-- Creates git commit and annotated tag
-- Pushes to GitHub and triggers workflow
-- Edits GitHub release with notes
-- Verifies ZIP asset creation
+**Preview before executing:**
+```bash
+# See what would happen without making changes
+./scripts/release patch --dry-run
+```
+
+**Explicit version:**
+```bash
+# Use specific version number
+./scripts/release 2.7.0 --notes /tmp/release_notes.md --yes
+```
+
+**Interactive mode:**
+```bash
+# Select version type from menu
+./scripts/release
+```
+
+### What the Script Does
+
+The script automates the complete release workflow:
+
+1. **Validates environment** - Checks for git, gh, jq; verifies authentication
+2. **Checks working directory** - Ensures no uncommitted changes
+3. **Calculates version** - Based on VERSION_SPEC and current version
+4. **Validates branch** - Ensures beta from feature branch, stable from main
+5. **Checks tag** - Verifies tag doesn't already exist
+6. **Updates manifest.json** - Sets new version number
+7. **Creates git commit** - Commits version change
+8. **Creates annotated tag** - Tags with release notes
+9. **Pushes to GitHub** - Pushes commit and tag to remote
+10. **Waits for workflow** - Monitors GitHub Actions workflow completion
+11. **Edits release** - Updates GitHub release with notes and prerelease flag
+12. **Verifies ZIP asset** - Confirms `adaptive_cover_pro.zip` was created
 
 ### Release Notes Guidelines
 
-- **NEVER** include `Co-Authored-By:` or Claude attributions
-- **ALWAYS** generate notes in `/tmp/release_notes.md` and use `--notes` parameter
-- **NEVER** use `--editor` parameter (avoids interactive editor)
-- Use clear, user-friendly language with emoji section headers
-- Include: Features, Bug Fixes, Documentation, Technical Details, Installation, Testing
-- For beta releases, mark as prerelease and include testing guidance
+**CRITICAL Rules:**
+- **NEVER** include `Co-Authored-By:` lines
+- **NEVER** include Claude/AI attributions
+- **ALWAYS** use `--notes` parameter with `/tmp/release_notes.md`
+- **NEVER** use `--editor` parameter
 
-### Determining Release Type by Branch
+**Content Guidelines:**
+- Use clear, user-friendly language
+- Include emoji section headers (🎯, ✨, 🐛, 📚, 🧪)
+- Document: Features, Bug Fixes, Documentation, Technical Details, Installation, Testing
+- For beta releases: Include testing instructions and warnings
 
-| Branch Type | Release Type | Example |
-|-------------|--------------|---------|
-| `feature/*`, `fix/*` | Beta (prerelease) | `v2.7.0-beta.1` |
-| `main` | Stable (production) | `v2.7.0` |
+### Branch-Based Release Strategy
 
-**⚠️ WARNING:** If you're creating a beta release from main, STOP! You should have created a feature branch first.
+| Branch Type | Release Type | Command | Version Format |
+|-------------|--------------|---------|----------------|
+| `feature/*`, `fix/*` | Beta (prerelease) | `./scripts/release beta --notes /tmp/release_notes.md --yes` | `v2.7.0-beta.1` |
+| `main` | Stable (production) | `./scripts/release patch --notes /tmp/release_notes.md --yes` | `v2.7.0` |
+
+**⚠️ WARNING:** If you find yourself creating a beta release from main, STOP! You should have created a feature branch first.
+
+**Workflow:**
+1. **Feature branch** → Create beta release → Test
+2. **Merge to main** → Create stable release
+
+### Error Handling and Rollback
+
+The script includes automatic rollback on failure:
+- Deletes created tags (local and remote)
+- Resets commits if version bump was created
+- Prevents partial releases
+
+If a release fails:
+1. Script automatically rolls back changes
+2. Check error message for cause
+3. Fix issue and retry
+4. Use `--dry-run` to preview before retry
+
+### Troubleshooting
+
+**Common issues:**
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "Working directory not clean" | Uncommitted changes | Commit or stash changes first |
+| "Tag already exists" | Tag created previously | Delete tag or use different version |
+| "GitHub CLI not authenticated" | Not logged into gh | Run `gh auth login` |
+| "Production releases must be from main" | Wrong branch | Switch to main or use `--force-branch` (not recommended) |
+| "ZIP asset not found" | Workflow failed | Check GitHub Actions logs |
+
+**Check workflow status:**
+```bash
+gh run list --workflow=publish-release.yml
+```
+
+**View release:**
+```bash
+gh release view v2.6.8
+```
 
 ## Documentation Guidelines
 
