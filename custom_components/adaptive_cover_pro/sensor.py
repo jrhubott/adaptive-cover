@@ -655,6 +655,12 @@ class AdaptiveCoverAdvancedDiagnosticEnumSensor(AdaptiveCoverDiagnosticEnumSenso
 class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
     """Sensor showing the last cover action performed."""
 
+    # Override parent class to enable by default (matches P0 classification and docs)
+    _attr_entity_registry_enabled_default = True
+
+    # Exclude from logbook/history to prevent clutter (diagnostic data, not activity tracking)
+    _attr_native_unit_of_measurement = ""  # Empty string triggers logbook exclusion
+
     def __init__(
         self,
         config_entry_id: str,
