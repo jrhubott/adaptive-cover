@@ -817,7 +817,7 @@ class AdaptiveCoverRetryCountSensor(AdaptiveCoverAdvancedDiagnosticSensor):
 
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_registry_enabled_default = False  # P1 sensor
-    _attr_native_unit_of_measurement = ""  # Exclude from logbook
+    _attr_native_unit_of_measurement = "retries"
 
     def __init__(
         self,

@@ -161,7 +161,7 @@ class AdaptiveCoverPositionMismatchSensor(
     def is_on(self) -> bool:
         """Return True if position mismatch detected."""
         # Check if any entity has a position mismatch between target and actual
-        for entity_id in self.coordinator._entities:
+        for entity_id in self.coordinator.entities:
             target = self.coordinator.target_call.get(entity_id)
             if target is None:
                 continue  # No command sent yet
@@ -185,7 +185,7 @@ class AdaptiveCoverPositionMismatchSensor(
 
         # Add per-entity details
         entity_details = {}
-        for entity_id in self.coordinator._entities:
+        for entity_id in self.coordinator.entities:
             target = self.coordinator.target_call.get(entity_id)
             actual = self.coordinator._get_current_position(entity_id)
 

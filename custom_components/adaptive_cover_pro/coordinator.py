@@ -1071,7 +1071,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         if not self.switch_enabled:
             return
 
-        for entity_id in self._entities:
+        for entity_id in self.entities:
             await self._verify_entity_position(entity_id, now)
 
     async def _verify_entity_position(self, entity_id: str, now: dt.datetime) -> None:
