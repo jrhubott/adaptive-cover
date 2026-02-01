@@ -346,7 +346,8 @@ class MyDiagnosticSensor(AdaptiveCoverDiagnosticSensor):
 - Diagnostic sensors update frequently (every calculation cycle, cover action, etc.)
 - Without `unit_of_measurement`, Home Assistant includes them in logbook by default
 - This creates excessive clutter in the activity/logbook feed
-- Setting empty string `""` triggers Home Assistant's logbook exclusion
+- Setting empty string `""` triggers Home Assistant's logbook exclusion, only use this for text sensors not sensors containing values
+- If the sensor contains a value make sure that the `unit_of_measurement` is set correctly
 - History is still recorded for debugging purposes
 
 **When to Apply:**
