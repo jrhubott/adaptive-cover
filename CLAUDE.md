@@ -181,19 +181,29 @@ The release script automates the entire release process:
 
 ### Running Tests
 
+**IMPORTANT:** When testing locally, Python and pytest run inside a virtual environment. Always activate it first:
+
 ```bash
+# Activate virtual environment (REQUIRED for local testing)
+source venv/bin/activate
+
 # Run all tests
-pytest tests/ -v
+python -m pytest tests/ -v
 
 # Run specific test file
-pytest tests/test_calculation.py -v
+python -m pytest tests/test_calculation.py -v
 
 # Run with coverage
-pytest tests/ --cov=custom_components/adaptive_cover_pro --cov-report=term
+python -m pytest tests/ --cov=custom_components/adaptive_cover_pro --cov-report=term
 
-# Run in virtual environment
-source venv/bin/activate && pytest tests/ -v
+# Run specific test by name
+python -m pytest tests/test_calculation.py::test_direct_sun_valid_after_sunset -v
+
+# One-liner (activate + run)
+source venv/bin/activate && python -m pytest tests/ -v
 ```
+
+**Note:** Use `python -m pytest` instead of just `pytest` to ensure the correct Python interpreter from the virtual environment is used.
 
 ### Test Coverage
 
@@ -201,10 +211,10 @@ Current test coverage status:
 
 | Module | Coverage | Tests | Status |
 |--------|----------|-------|--------|
-| calculation.py | 91% | 129 | ✅ Comprehensive |
+| calculation.py | 91% | 135 | ✅ Comprehensive |
 | helpers.py | 100% | 29 | ✅ Complete |
 | inverse_state behavior | 100% | 14 | ✅ Complete |
-| **Total** | **30%** | **172** | 🔄 In progress |
+| **Total** | **28%** | **178** | 🔄 In progress |
 
 **Test Organization:**
 - `tests/test_calculation.py` - Position calculation logic (129 tests)
@@ -251,8 +261,8 @@ See [UNIT_TESTS.md](UNIT_TESTS.md) for:
 
 **Testing checklist:**
 1. ✅ Write tests for new code before committing
-2. ✅ Ensure all tests pass locally: `pytest tests/ -v`
-3. ✅ Check coverage: `pytest tests/ --cov --cov-report=term`
+2. ✅ Ensure all tests pass locally: `source venv/bin/activate && python -m pytest tests/ -v`
+3. ✅ Check coverage: `source venv/bin/activate && python -m pytest tests/ --cov --cov-report=term`
 4. ✅ Aim for 90%+ coverage for calculation logic
 5. ✅ Update UNIT_TESTS.md if adding new test categories
 6. ✅ Follow existing patterns in test_calculation.py
@@ -261,11 +271,12 @@ See [UNIT_TESTS.md](UNIT_TESTS.md) for:
 ```bash
 # 1. Make code changes
 # 2. Add/update tests
-# 3. Run tests
-pytest tests/ -v
+# 3. Activate virtual environment and run tests
+source venv/bin/activate
+python -m pytest tests/ -v
 
 # 4. Check coverage
-pytest tests/test_calculation.py --cov=custom_components/adaptive_cover_pro/calculation.py --cov-report=term
+python -m pytest tests/test_calculation.py --cov=custom_components/adaptive_cover_pro/calculation.py --cov-report=term
 
 # 5. Commit code and tests together
 git add custom_components/adaptive_cover_pro/calculation.py tests/test_calculation.py
