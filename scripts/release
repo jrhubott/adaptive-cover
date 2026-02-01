@@ -487,7 +487,13 @@ calculate_new_version() {
 
     case "$spec" in
         patch)
-            new_version="$major.$minor.$((patch + 1))"
+            if [[ -n $beta ]]; then
+                # Current version is beta - produce stable version by removing beta suffix
+                new_version="$major.$minor.$patch"
+            else
+                # Current version is stable - increment patch as usual
+                new_version="$major.$minor.$((patch + 1))"
+            fi
             ;;
         minor)
             new_version="$major.$((minor + 1)).0"
