@@ -4,6 +4,10 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Stop any running Home Assistant instances first
+echo "Stopping any running Home Assistant instances..."
+"${PWD}/scripts/stop"
+
 # Activate virtual environment
 if [[ ! -d "venv" ]]; then
     echo "Error: venv directory not found. Run ./scripts/setup first."
@@ -25,4 +29,5 @@ fi
 export PYTHONPATH="${PYTHONPATH}:${PWD}/custom_components"
 
 # Start Home Assistant
+echo "Starting Home Assistant..."
 hass --config "${PWD}/config" --debug

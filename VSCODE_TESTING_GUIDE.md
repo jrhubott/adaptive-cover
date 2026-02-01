@@ -273,12 +273,14 @@ code --install-extension esbenp.prettier-vscode
 3. Set a breakpoint on the line: `_LOGGER.debug("Updating Adaptive Cover data")`
 4. Press **F5**
 5. Select **"Debug Home Assistant"** from dropdown
-6. Wait for Home Assistant to start (takes 30-60 seconds)
-7. Watch debug console for startup logs
-8. **Trigger a coordinator update** (happens automatically every few minutes, or change a sensor value)
-9. Breakpoint should be hit
+6. **Note:** Any running HA instance is automatically stopped first
+7. Wait for Home Assistant to start (takes 30-60 seconds)
+8. Watch debug console for startup logs
+9. **Trigger a coordinator update** (happens automatically every few minutes, or change a sensor value)
+10. Breakpoint should be hit
 
 **Expected Results:**
+- If HA was running, you'll see "Stopping Home Assistant gracefully..."
 - Home Assistant starts at http://localhost:8123
 - Debug console shows HA logs
 - Breakpoint is hit during coordinator update
@@ -287,8 +289,8 @@ code --install-extension esbenp.prettier-vscode
 **Troubleshooting:**
 - HA won't start:
   - Check `config/configuration.yaml` exists
-  - Check no other HA instance is running on port 8123
   - Look for errors in debug console
+  - Try `./scripts/stop` to manually stop any stuck instances
 - Breakpoint not hit:
   - Coordinator updates are infrequent - wait a few minutes
   - Or trigger manually by changing sun position (if configured)
@@ -600,6 +602,53 @@ Refer to **DEVELOPMENT.md** (lines 1082+) for comprehensive debugging documentat
 
 ---
 
+## Automatic Instance Management
+
+The development environment automatically manages Home Assistant instances to prevent conflicts.
+
+### Auto-Stop Feature
+
+Both `./scripts/develop` and the VS Code "Debug Home Assistant" configuration automatically stop any running Home Assistant instances before starting a new one.
+
+**How it works:**
+1. Detects running HA processes using your config directory
+2. Sends graceful shutdown signal (SIGTERM)
+3. Waits up to 10 seconds for clean shutdown
+4. Force kills if necessary
+5. Starts new instance
+
+**Manual control:**
+
+```bash
+# Stop all running HA instances
+./scripts/stop
+
+# Start HA (stops any running instances first)
+./scripts/develop
+```
+
+**Benefits:**
+- No more "Another Home Assistant instance is already running" errors
+- Clean restarts every time
+- Safe for debugging - preserves log files and state
+
+### Managing Stuck Instances
+
+If Home Assistant becomes unresponsive:
+
+```bash
+# Force stop all instances
+./scripts/stop
+
+# Verify no processes running
+ps aux | grep "[h]ass --config"
+
+# Start fresh
+./scripts/develop
+```
+
+---
+
 ## Quick Reference
 
 | Action | Shortcut |
@@ -614,5 +663,6 @@ Refer to **DEVELOPMENT.md** (lines 1082+) for comprehensive debugging documentat
 | Test Explorer | Click beaker icon in sidebar |
 | Problems Panel | **Cmd+Shift+M** |
 | Command Palette | **Cmd+Shift+P** |
+| Stop Home Assistant | `./scripts/stop` |
 
 Happy debugging! 🐛🔍

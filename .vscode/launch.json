@@ -18,7 +18,9 @@
       "justMyCode": false,
       "purpose": ["debug-in-terminal"],
       "python": "${workspaceFolder}/venv/bin/python",
+      "preLaunchTask": "Stop Home Assistant",
       // NOTE: This configuration matches scripts/develop behavior:
+      // - Stops any running HA instance first (preLaunchTask)
       // - Uses venv Python interpreter (python field above)
       // - Sets PYTHONPATH to custom_components (env.PYTHONPATH)
       // - Runs with --debug flag (args)

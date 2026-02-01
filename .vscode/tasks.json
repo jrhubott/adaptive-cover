@@ -2,6 +2,18 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Stop Home Assistant",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/stop",
+      "problemMatcher": [],
+      "group": "homeassistant",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "close": true
+      }
+    },
+    {
       "label": "Run Home Assistant on port 8123",
       "type": "shell",
       "command": "${workspaceFolder}/scripts/develop",
@@ -14,7 +26,8 @@
       },
       "runOptions": {
         "instanceLimit": 1
-      }
+      },
+      "dependsOn": ["Stop Home Assistant"]
     },
     {
       "label": "Lint with Ruff",
