@@ -232,13 +232,19 @@ This applies to ALL commits (regular commits, merge commits, etc.) and release n
 
 ### Release Strategy
 
+**Release Notes Directory:**
+- All release notes stored in `release_notes/` directory
+- Filename format: `vX.Y.Z.md` or `vX.Y.Z-beta.N.md`
+- Provides historical tracking of all releases
+- Committed to git for version control
+
 **Feature Branch:**
-- Create BETA releases: `./scripts/release beta --notes /tmp/release_notes.md --yes`
+- Create BETA releases: `./scripts/release beta --notes release_notes/v2.7.0-beta.1.md --yes`
 - Beta version format: `v2.7.0-beta.1`
 - Mark as prerelease for testing
 
 **Main Branch:**
-- Create STABLE releases: `./scripts/release patch` (or minor/major)
+- Create STABLE releases: `./scripts/release patch --notes release_notes/v2.7.0.md --yes`
 - Only merge to main AFTER successful beta testing
 - Stable version format: `v2.7.0`
 
@@ -353,8 +359,11 @@ The release script automates version management, git tagging, and GitHub release
 
 **Standard workflow (recommended):**
 ```bash
-# 1. Generate release notes
-cat > /tmp/release_notes.md << 'EOF'
+# 1. Create release_notes directory if it doesn't exist
+mkdir -p release_notes
+
+# 2. Generate release notes (use version number in filename)
+cat > release_notes/v2.6.11.md << 'EOF'
 ## 🎯 Release Title
 
 ### ✨ Features
@@ -368,8 +377,13 @@ cat > /tmp/release_notes.md << 'EOF'
 - Home Assistant 2024.5.0+
 EOF
 
-# 2. Create release
-./scripts/release patch --notes /tmp/release_notes.md --yes
+# 3. Create release
+./scripts/release patch --notes release_notes/v2.6.11.md --yes
+
+# 4. Commit the release notes to git
+git add release_notes/v2.6.11.md
+git commit -m "docs: Add release notes for v2.6.11"
+git push origin main
 ```
 
 **Quick beta release:**
@@ -386,8 +400,8 @@ EOF
 
 **Explicit version:**
 ```bash
-# Use specific version number
-./scripts/release 2.7.0 --notes /tmp/release_notes.md --yes
+# Use specific version number (create release notes first)
+./scripts/release 2.7.0 --notes release_notes/v2.7.0.md --yes
 ```
 
 **Interactive mode:**
@@ -418,8 +432,14 @@ The script automates the complete release workflow:
 **CRITICAL Rules:**
 - **NEVER** include `Co-Authored-By:` lines
 - **NEVER** include Claude/AI attributions
-- **ALWAYS** use `--notes` parameter with `/tmp/release_notes.md`
+- **ALWAYS** use `--notes` parameter with versioned filename: `release_notes/vX.Y.Z.md`
 - **NEVER** use `--editor` parameter
+- **ALWAYS** commit release notes to git after creating release
+
+**File Naming Convention:**
+- Production releases: `release_notes/v2.6.11.md`
+- Beta releases: `release_notes/v2.7.0-beta.1.md`
+- Directory: `release_notes/` (tracked in git)
 
 **Content Guidelines:**
 - Use clear, user-friendly language
@@ -431,8 +451,8 @@ The script automates the complete release workflow:
 
 | Branch Type | Release Type | Command | Version Format |
 |-------------|--------------|---------|----------------|
-| `feature/*`, `fix/*` | Beta (prerelease) | `./scripts/release beta --notes /tmp/release_notes.md --yes` | `v2.7.0-beta.1` |
-| `main` | Stable (production) | `./scripts/release patch --notes /tmp/release_notes.md --yes` | `v2.7.0` |
+| `feature/*`, `fix/*` | Beta (prerelease) | `./scripts/release beta --notes release_notes/v2.7.0-beta.1.md --yes` | `v2.7.0-beta.1` |
+| `main` | Stable (production) | `./scripts/release patch --notes release_notes/v2.7.0.md --yes` | `v2.7.0` |
 
 **⚠️ WARNING:** If you find yourself creating a beta release from main, STOP! You should have created a feature branch first.
 
@@ -622,6 +642,9 @@ adaptive-cover/
 │   ├── test_calculation.py      # 129 tests, 91% coverage
 │   ├── test_helpers.py          # 29 tests, 100% coverage
 │   └── test_inverse_state.py    # 14 tests, 100% coverage
+├── release_notes/               # Historical release notes
+│   ├── README.md                # Release notes documentation
+│   └── vX.Y.Z.md                # Individual release notes (versioned)
 ├── DEVELOPMENT.md               # Developer documentation
 ├── UNIT_TESTS.md                # Unit test documentation
 ├── CLAUDE.md                    # Claude Code instructions (this file)
