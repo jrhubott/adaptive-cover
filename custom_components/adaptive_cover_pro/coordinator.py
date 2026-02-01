@@ -1076,6 +1076,10 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
     async def _verify_entity_position(self, entity_id: str, now: dt.datetime) -> None:
         """Verify a single entity's position and retry if needed."""
+        # Update last verification time FIRST for diagnostic tracking
+        check_time = now if isinstance(now, dt.datetime) else dt.datetime.now()
+        self._last_verification[entity_id] = check_time
+
         # Skip if manual override active
         if self.manager.is_cover_manual(entity_id):
             self._reset_retry_count(entity_id)
@@ -1098,9 +1102,6 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         if actual_position is None:
             self.logger.debug("Cannot verify position for %s: position unavailable", entity_id)
             return
-
-        # Update last verification time
-        self._last_verification[entity_id] = now if isinstance(now, dt.datetime) else dt.datetime.now()
 
         # Check if positions match within tolerance
         # Compare to target_call (what we sent), not self.state (current calculation)
