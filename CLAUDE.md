@@ -180,6 +180,34 @@ git push origin main
 # Issue auto-closes when pushed to main
 ```
 
+### Merging and Release Workflow
+
+**CRITICAL: Context-Aware Merge Behavior**
+
+**When Exiting Plan Mode:**
+- ✅ ALWAYS ask the user if they want to:
+  1. Merge the feature/fix branch back into main
+  2. Create a production release
+- Use the AskUserQuestion tool to present these options
+- Wait for user confirmation before proceeding with merge or release
+
+**When NOT in Plan Mode (ad-hoc changes):**
+- ✅ Stay on the feature/fix branch after pushing changes
+- ❌ DO NOT ask about merging to main
+- ❌ DO NOT merge automatically
+- The user will decide when to merge separately
+
+**Example Question (Plan Mode Only):**
+```
+After completing the implementation, ask:
+"The changes have been committed to the feature branch. What would you like to do next?"
+
+Options:
+1. Merge to main and create production release
+2. Merge to main only (no release)
+3. Stay on feature branch for more testing
+```
+
 **gh CLI Quick Reference:**
 
 | Task | Command |
