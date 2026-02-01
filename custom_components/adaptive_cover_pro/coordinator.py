@@ -149,6 +149,14 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
     config_entry: ConfigEntry
 
+    # Default capabilities for covers when entity not ready
+    _DEFAULT_CAPABILITIES = {
+        "has_set_position": True,
+        "has_set_tilt_position": False,
+        "has_open": True,
+        "has_close": True,
+    }
+
     def __init__(self, hass: HomeAssistant) -> None:  # noqa: D107
         super().__init__(hass, LOGGER, name=DOMAIN)
 
@@ -215,6 +223,62 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._check_interval_minutes = POSITION_CHECK_INTERVAL_MINUTES
         self._position_tolerance = POSITION_TOLERANCE_PERCENT
         self._max_retries = MAX_POSITION_RETRIES
+
+    def _get_cover_capabilities(self, entity: str) -> dict[str, bool]:
+        """Get cover capabilities with fallback to safe defaults.
+
+        Args:
+            entity: The cover entity ID
+
+        Returns:
+            Dict of capabilities (has_set_position, has_set_tilt_position, has_open, has_close)
+        """
+        caps = check_cover_features(self.hass, entity)
+        if caps is None:
+            self.logger.debug("Cover %s not ready, using safe defaults", entity)
+            return self._DEFAULT_CAPABILITIES.copy()
+        return caps
+
+    @property
+    def is_tilt_cover(self) -> bool:
+        """Check if this is a tilt cover."""
+        return self._cover_type == "cover_tilt"
+
+    @property
+    def is_blind_cover(self) -> bool:
+        """Check if this is a vertical blind."""
+        return self._cover_type == "cover_blind"
+
+    @property
+    def is_awning_cover(self) -> bool:
+        """Check if this is a horizontal awning."""
+        return self._cover_type == "cover_awning"
+
+    def _read_position_with_capabilities(
+        self, entity: str, caps: dict[str, bool], state_obj: State | None = None
+    ) -> int | None:
+        """Read position based on cover type and capabilities.
+
+        Args:
+            entity: Entity ID
+            caps: Capabilities dict
+            state_obj: Optional state object (for event handling)
+
+        Returns:
+            Current position or None
+        """
+        if self.is_tilt_cover:
+            if caps.get("has_set_tilt_position", True):
+                if state_obj:
+                    return state_obj.attributes.get("current_tilt_position")
+                return state_attr(self.hass, entity, "current_tilt_position")
+        else:
+            if caps.get("has_set_position", True):
+                if state_obj:
+                    return state_obj.attributes.get("current_position")
+                return state_attr(self.hass, entity, "current_position")
+
+        return get_open_close_state(self.hass, entity)
 
     async def async_config_entry_first_refresh(self) -> None:
         """Config entry first refresh."""
@@ -283,27 +347,12 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             return
         if self.wait_for_target.get(entity_id):
             # Check capabilities on-demand
-            caps = check_cover_features(self.hass, entity_id)
-            if caps is None:
-                # Entity not ready, use safe defaults
-                caps = {
-                    "has_set_position": True,
-                    "has_set_tilt_position": False,
-                    "has_open": True,
-                    "has_close": True,
-                }
+            caps = self._get_cover_capabilities(entity_id)
 
             # Get position based on capability
-            if self._cover_type == "cover_tilt":
-                if caps.get("has_set_tilt_position", True):
-                    position = event.new_state.attributes.get("current_tilt_position")
-                else:
-                    position = get_open_close_state(self.hass, entity_id)
-            else:
-                if caps.get("has_set_position", True):
-                    position = event.new_state.attributes.get("current_position")
-                else:
-                    position = get_open_close_state(self.hass, entity_id)
+            position = self._read_position_with_capabilities(
+                entity_id, caps, event.new_state
+            )
 
             if position == self.target_call.get(entity_id):
                 self.wait_for_target[entity_id] = False
@@ -335,6 +384,56 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         )
         self._scheduled_time = self._end_time
 
+    def _calculate_cover_state(self, cover_data, options) -> int:
+        """Calculate cover state and update internal state.
+
+        Args:
+            cover_data: Cover calculation data object
+            options: Configuration options
+
+        Returns:
+            Calculated state position
+        """
+        # Access climate data if climate mode is enabled
+        if self._climate_mode:
+            self.climate_mode_data(options, cover_data)
+        else:
+            self.logger.debug("Control method is %s", self.control_method)
+
+        # Calculate the state of the cover
+        self.normal_cover_state = NormalCoverState(cover_data)
+        self.logger.debug(
+            "Determined normal cover state to be %s", self.normal_cover_state
+        )
+
+        self.default_state = round(self.normal_cover_state.get_state())
+        self.logger.debug("Determined default state to be %s", self.default_state)
+        return self.state
+
+    async def _update_solar_times_if_needed(self, normal_cover) -> tuple[dt.datetime, dt.datetime]:
+        """Update solar times if needed (first refresh or new day).
+
+        Args:
+            normal_cover: Cover object with solar_times method
+
+        Returns:
+            Tuple of (start_time, end_time)
+        """
+        if (
+            self.first_refresh
+            or self._sun_start_time is None
+            or dt.datetime.now(pytz.UTC).date() != self._sun_start_time.date()
+        ):
+            self.logger.debug("Calculating solar times")
+            loop = asyncio.get_event_loop()
+            start, end = await loop.run_in_executor(None, normal_cover.solar_times)
+            self._sun_start_time = start
+            self._sun_end_time = end
+            self.logger.debug("Sun start time: %s, Sun end time: %s", start, end)
+            return start, end
+
+        return self._sun_start_time, self._sun_end_time
+
     async def _async_update_data(self) -> AdaptiveCoverData:
         self.logger.debug("Updating data")
         if self.first_refresh:
@@ -343,30 +442,15 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         options = self.config_entry.options
         self._update_options(options)
 
-        # Get data for the blind
+        # Get data for the blind and update manager
         cover_data = self.get_blind_data(options=options)
-
-        # Update manager with covers
         self._update_manager_and_covers()
 
-        # Access climate data if climate mode is enabled
-        if self._climate_mode:
-            self.climate_mode_data(options, cover_data)
-        else:
-            self.logger.debug("Control method is %s", self.control_method)
-
-        # calculate the state of the cover
-        self.normal_cover_state = NormalCoverState(cover_data)
-        self.logger.debug(
-            "Determined normal cover state to be %s", self.normal_cover_state
-        )
-
-        self.default_state = round(self.normal_cover_state.get_state())
-        self.logger.debug("Determined default state to be %s", self.default_state)
-        state = self.state
-
+        # Calculate cover state
+        state = self._calculate_cover_state(cover_data, options)
         await self.manager.reset_if_needed()
 
+        # Schedule end time update if needed
         if (
             self._end_time
             and self._track_end_time
@@ -384,21 +468,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         if self.timed_refresh:
             await self.async_handle_timed_refresh(options)
 
+        # Update solar times
         normal_cover = self.normal_cover_state.cover
-        # Run the solar_times method in a separate thread
-        if (
-            self.first_refresh
-            or self._sun_start_time is None
-            or dt.datetime.now(pytz.UTC).date() != self._sun_start_time.date()
-        ):
-            self.logger.debug("Calculating solar times")
-            loop = asyncio.get_event_loop()
-            start, end = await loop.run_in_executor(None, normal_cover.solar_times)
-            self._sun_start_time = start
-            self._sun_end_time = end
-            self.logger.debug("Sun start time: %s, Sun end time: %s", start, end)
-        else:
-            start, end = self._sun_start_time, self._sun_end_time
+        start, end = await self._update_solar_times_if_needed(normal_cover)
 
         # Build diagnostic data if enabled
         diagnostics = None
@@ -513,29 +585,22 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         """Call service to set cover position."""
         await self.async_set_manual_position(entity, state)
 
-    async def async_set_manual_position(self, entity, state):
-        """Call service to set cover position or open/close based on capability."""
-        if not self.check_position(entity, state):
-            return
+    def _prepare_position_service_call(
+        self, entity: str, state: int, caps: dict[str, bool]
+    ) -> tuple[str, dict, bool]:
+        """Determine service and data based on capabilities.
 
-        # Check capabilities on-demand
-        caps = check_cover_features(self.hass, entity)
-        if caps is None:
-            # Entity not ready yet, use safe defaults
-            self.logger.debug(
-                "Cover %s not ready, assuming position control",
-                entity,
-            )
-            caps = {
-                "has_set_position": True,
-                "has_set_tilt_position": False,
-                "has_open": True,
-                "has_close": True,
-            }
+        Args:
+            entity: Entity ID
+            state: Target position (0-100)
+            caps: Cover capabilities dict
 
+        Returns:
+            Tuple of (service_name, service_data, supports_position)
+        """
         # Determine if cover supports position control
         supports_position = False
-        if self._cover_type == "cover_tilt":
+        if self.is_tilt_cover:
             supports_position = caps.get("has_set_tilt_position", True)
         else:
             supports_position = caps.get("has_set_position", True)
@@ -548,11 +613,11 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         )
 
         if supports_position:
-            # Use position control (existing behavior)
+            # Use position control
             service = SERVICE_SET_COVER_POSITION
             service_data = {ATTR_ENTITY_ID: entity}
 
-            if self._cover_type == "cover_tilt":
+            if self.is_tilt_cover:
                 service = SERVICE_SET_COVER_TILT_POSITION
                 service_data[ATTR_TILT_POSITION] = state
             else:
@@ -566,7 +631,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self.target_call,
             )
         else:
-            # Use open/close control (new behavior)
+            # Use open/close control
             has_open = caps.get("has_open", False)
             has_close = caps.get("has_close", False)
 
@@ -575,7 +640,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                     "Cover %s does not support both open and close. Skipping.",
                     entity,
                 )
-                return
+                return None, None, False
 
             # Apply threshold
             if state >= self._open_close_threshold:
@@ -595,7 +660,19 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 service,
             )
 
-        # Track action for diagnostic sensor
+        return service, service_data, supports_position
+
+    def _track_cover_action(
+        self, entity: str, service: str, state: int, supports_position: bool
+    ) -> None:
+        """Track cover action for diagnostic sensor.
+
+        Args:
+            entity: Entity ID
+            service: Service name called
+            state: Requested position
+            supports_position: Whether position control is used
+        """
         self.last_cover_action = {
             "entity_id": entity,
             "service": service,
@@ -607,6 +684,25 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             "covers_controlled": 1,
         }
 
+    async def async_set_manual_position(self, entity, state):
+        """Call service to set cover position or open/close based on capability."""
+        if not self.check_position(entity, state):
+            return
+
+        # Check capabilities and prepare service call
+        caps = self._get_cover_capabilities(entity)
+        service, service_data, supports_position = self._prepare_position_service_call(
+            entity, state, caps
+        )
+
+        # Skip if service preparation failed (e.g., missing open/close capabilities)
+        if service is None:
+            return
+
+        # Track action for diagnostic sensor
+        self._track_cover_action(entity, service, state, supports_position)
+
+        # Execute service call
         self.logger.debug("Run %s with data %s", service, service_data)
         await self.hass.services.async_call(COVER_DOMAIN, service, service_data)
         self.logger.debug("Successfully called service %s for %s", service, entity)
@@ -639,7 +735,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
     def get_blind_data(self, options):
         """Assign correct class for type of blind."""
-        if self._cover_type == "cover_blind":
+        if self.is_blind_cover:
             cover_data = AdaptiveVerticalCover(
                 self.hass,
                 self.logger,
@@ -647,7 +743,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 *self.common_data(options),
                 *self.vertical_data(options),
             )
-        if self._cover_type == "cover_awning":
+        if self.is_awning_cover:
             cover_data = AdaptiveHorizontalCover(
                 self.hass,
                 self.logger,
@@ -656,7 +752,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 *self.vertical_data(options),
                 *self.horizontal_data(options),
             )
-        if self._cover_type == "cover_tilt":
+        if self.is_tilt_cover:
             cover_data = AdaptiveTiltCover(
                 self.hass,
                 self.logger,
@@ -731,26 +827,10 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         For open/close-only covers, maps state to 0 (closed) or 100 (open).
         """
         # Check capabilities on-demand
-        caps = check_cover_features(self.hass, entity)
-        if caps is None:
-            # Entity not ready, use safe defaults
-            caps = {
-                "has_set_position": True,
-                "has_set_tilt_position": False,
-                "has_open": True,
-                "has_close": True,
-            }
+        caps = self._get_cover_capabilities(entity)
 
-        # Check if cover supports position
-        if self._cover_type == "cover_tilt":
-            if caps.get("has_set_tilt_position", True):  # Default True for backward compat
-                return state_attr(self.hass, entity, "current_tilt_position")
-        else:
-            if caps.get("has_set_position", True):  # Default True for backward compat
-                return state_attr(self.hass, entity, "current_position")
-
-        # Fallback to open/close state mapping
-        return get_open_close_state(self.hass, entity)
+        # Read position based on cover type and capabilities
+        return self._read_position_with_capabilities(entity, caps)
 
     def check_position(self, entity, state):
         """Check if position is different as state."""
@@ -891,11 +971,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             options.get(CONF_TILT_MODE),
         ]
 
-    def build_diagnostic_data(self) -> dict:
-        """Build diagnostic data for diagnostic sensors."""
+    def _build_solar_diagnostics(self) -> dict:
+        """Build solar position diagnostics."""
         diagnostics = {}
-
-        # Solar position data
         sun_azimuth, sun_elevation = self.pos_sun
         diagnostics["sun_azimuth"] = sun_azimuth
         diagnostics["sun_elevation"] = sun_elevation
@@ -904,7 +982,11 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         if self.normal_cover_state and hasattr(self.normal_cover_state.cover, "gamma"):
             diagnostics["gamma"] = self.normal_cover_state.cover.gamma
 
-        # Calculated positions
+        return diagnostics
+
+    def _build_position_diagnostics(self) -> dict:
+        """Build calculated position diagnostics."""
+        diagnostics = {}
         diagnostics["calculated_position"] = self.default_state
         if self.climate_state is not None:
             diagnostics["calculated_position_climate"] = self.climate_state
@@ -913,16 +995,23 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         control_status = self._determine_control_status()
         diagnostics["control_status"] = control_status
 
-        # Time window status
-        diagnostics["time_window"] = {
-            "check_adaptive_time": self.check_adaptive_time,
-            "after_start_time": self.after_start_time,
-            "before_end_time": self.before_end_time,
-            "start_time": self._start_time,
-            "end_time": self._end_time,
+        return diagnostics
+
+    def _build_time_window_diagnostics(self) -> dict:
+        """Build time window diagnostics."""
+        return {
+            "time_window": {
+                "check_adaptive_time": self.check_adaptive_time,
+                "after_start_time": self.after_start_time,
+                "before_end_time": self.before_end_time,
+                "start_time": self._start_time,
+                "end_time": self._end_time,
+            }
         }
 
-        # Sun validity status
+    def _build_sun_validity_diagnostics(self) -> dict:
+        """Build sun validity diagnostics."""
+        diagnostics = {}
         if self.normal_cover_state and self.normal_cover_state.cover:
             cover = self.normal_cover_state.cover
             diagnostics["sun_validity"] = {
@@ -930,8 +1019,11 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 "valid_elevation": cover.valid_elevation,
                 "in_blind_spot": getattr(cover, "in_blind_spot", None),
             }
+        return diagnostics
 
-        # Climate data if enabled (P1 diagnostics)
+    def _build_climate_diagnostics(self) -> dict:
+        """Build climate mode diagnostics."""
+        diagnostics = {}
         if self._climate_mode and self.climate_data is not None:
             diagnostics["climate_control_method"] = self.control_method
 
@@ -953,11 +1045,25 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 "irradiance_active": self.climate_data.irradiance if self.climate_data._use_irradiance else None,
             }
 
-        # Last cover action tracking
+        return diagnostics
+
+    def _build_last_action_diagnostics(self) -> dict:
+        """Build last cover action diagnostics."""
+        diagnostics = {}
         if self.last_cover_action.get("entity_id"):
             diagnostics["last_cover_action"] = self.last_cover_action.copy()
-
         return diagnostics
+
+    def build_diagnostic_data(self) -> dict:
+        """Build diagnostic data for diagnostic sensors."""
+        return {
+            **self._build_solar_diagnostics(),
+            **self._build_position_diagnostics(),
+            **self._build_time_window_diagnostics(),
+            **self._build_sun_validity_diagnostics(),
+            **self._build_climate_diagnostics(),
+            **self._build_last_action_diagnostics(),
+        }
 
     def _determine_control_status(self) -> str:
         """Determine the current control status."""
