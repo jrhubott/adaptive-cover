@@ -1068,7 +1068,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             return
 
         # Skip if automatic control is disabled
-        if not self.switch_enabled:
+        if not self.automatic_control:
             return
 
         for entity_id in self.entities:
