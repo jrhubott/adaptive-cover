@@ -150,6 +150,219 @@ git branch -d feature/my-new-feature
 git push origin --delete feature/my-new-feature
 ```
 
+## GitHub Issues Workflow
+
+### Working with GitHub Issues
+
+When the user asks to "fix issue #123" or references a specific issue number, follow this workflow:
+
+#### Step 1: Fetch Issue Details
+
+```bash
+# View issue details
+gh issue view 123
+
+# Get issue title and body
+gh issue view 123 --json title,body,labels,state --jq '.'
+```
+
+**Important:** Always fetch and read the issue details before starting work. Understand:
+- What the problem is
+- Steps to reproduce (if bug)
+- Expected vs actual behavior
+- Any labels or priority indicators
+
+#### Step 2: Create Fix Branch
+
+Branch naming convention for issues:
+```bash
+# For bugs (most common)
+git checkout -b fix/issue-123-short-description
+
+# For feature requests
+git checkout -b feature/issue-123-short-description
+
+# Examples:
+git checkout -b fix/issue-45-sensor-unavailable
+git checkout -b feature/issue-67-add-entity-picture
+```
+
+**Branch naming rules:**
+- ✅ Include issue number: `issue-123`
+- ✅ Add short description: `sensor-unavailable`
+- ✅ Use fix/ for bugs, feature/ for enhancements
+- ✅ Keep description concise (2-4 words)
+- ❌ Don't use just the issue number: `fix/123`
+
+#### Step 3: Make Changes and Commit
+
+**Commit message format with issue references:**
+```bash
+# Simple fix (one commit)
+git commit -m "fix: Resolve sensor unavailable error
+
+Fixes #123"
+
+# Feature implementation (one commit)
+git commit -m "feat: Add entity picture support
+
+Implements #67"
+
+# Multiple commits (reference in each)
+git commit -m "fix: Update coordinator entity access
+
+Part of #123"
+
+git commit -m "fix: Add unit of measurement to retry sensor
+
+Fixes #123"
+```
+
+**Commit message keywords that auto-close issues:**
+- `Fixes #123` - Closes the issue when merged to main
+- `Closes #123` - Closes the issue when merged to main
+- `Resolves #123` - Closes the issue when merged to main
+
+**Other useful keywords (don't auto-close):**
+- `Part of #123` - References without closing
+- `Related to #123` - Links to related issue
+- `See #123` - General reference
+
+**Important:** Use closing keywords (`Fixes`, `Closes`, `Resolves`) in the final commit that completes the fix.
+
+#### Step 4: Push and Create Pull Request
+
+```bash
+# Push fix branch
+git push -u origin fix/issue-123-short-description
+
+# Create PR that references the issue
+gh pr create \
+  --title "Fix: Resolve sensor unavailable error (#123)" \
+  --body "$(cat <<'EOF'
+## Fixes #123
+
+### Problem
+Brief description of the issue
+
+### Solution
+Brief description of the fix
+
+### Testing
+- [ ] Unit tests passing
+- [ ] Manual testing completed
+- [ ] No breaking changes
+EOF
+)"
+```
+
+**PR title format:**
+- Include issue number in title: `Fix: Description (#123)`
+- Use imperative mood: "Fix", "Add", "Update"
+- Keep concise but descriptive
+
+#### Step 5: Merge and Auto-Close
+
+When the PR is merged to main:
+- GitHub automatically closes the issue if commit includes `Fixes #123`
+- Issue is linked to the PR and commits
+- Timeline shows when and how it was resolved
+
+### Complete Example Workflow
+
+**User says:** "Fix issue #123"
+
+**Steps:**
+```bash
+# 1. Fetch issue details
+gh issue view 123
+# Output shows: "Position Mismatched sensor becomes unavailable"
+
+# 2. Create fix branch from main
+git checkout main
+git pull origin main
+git checkout -b fix/issue-123-sensor-unavailable
+
+# 3. Investigate and fix the issue
+# ... make code changes ...
+
+# 4. Run tests
+source venv/bin/activate && python -m pytest tests/ -v
+
+# 5. Commit with issue reference
+git add <files>
+git commit -m "fix: Resolve Position Mismatched sensor unavailable error
+
+Changed coordinator._entities to coordinator.entities in binary_sensor.py
+to fix AttributeError that caused sensor to become unavailable.
+
+Fixes #123"
+
+# 6. Push fix branch
+git push -u origin fix/issue-123-sensor-unavailable
+
+# 7. For direct merge (skip PR if user requests)
+git checkout main
+git merge fix/issue-123-sensor-unavailable
+git push origin main
+
+# Issue #123 is automatically closed when pushed to main
+```
+
+### Best Practices
+
+**When fixing issues:**
+- ✅ Read the full issue description and comments
+- ✅ Reproduce the issue if possible
+- ✅ Check for related/duplicate issues
+- ✅ Add regression tests to prevent recurrence
+- ✅ Update documentation if behavior changes
+- ✅ Reference the issue in ALL relevant commits
+- ✅ Test the fix thoroughly before closing
+
+**Communication:**
+- Add comments to issue during investigation if needed
+- Update issue with findings or questions
+- Close issue with final comment summarizing fix
+
+**Using gh CLI:**
+```bash
+# List open issues
+gh issue list
+
+# List issues with specific label
+gh issue list --label bug
+
+# Add comment to issue
+gh issue comment 123 --body "Investigating this issue now"
+
+# Close issue manually (if not auto-closed)
+gh issue close 123 --comment "Fixed in v2.6.8"
+
+# Reopen issue if needed
+gh issue reopen 123
+```
+
+### Quick Reference
+
+| Task | Command |
+|------|---------|
+| View issue | `gh issue view 123` |
+| Create fix branch | `git checkout -b fix/issue-123-description` |
+| Commit with close | `git commit -m "fix: Description\n\nFixes #123"` |
+| Create PR | `gh pr create --title "Fix: Description (#123)"` |
+| Close manually | `gh issue close 123 --comment "Message"` |
+| List open issues | `gh issue list` |
+| List your assigned | `gh issue list --assignee @me` |
+
+### Important Notes
+
+- **Always work on a branch** - Never fix issues directly on main
+- **Use closing keywords** - `Fixes #123` in commit message to auto-close
+- **Test before closing** - Ensure fix actually resolves the issue
+- **Document in releases** - Include issue fixes in release notes
+- **Link PRs and commits** - GitHub automatically links when you use #123 syntax
+
 ## Commit Message Guidelines
 
 **CRITICAL:** Git commits must NOT include Claude attribution:
