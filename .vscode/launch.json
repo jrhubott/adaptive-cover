@@ -16,7 +16,16 @@
       },
       "console": "integratedTerminal",
       "justMyCode": false,
-      "purpose": ["debug-in-terminal"]
+      "purpose": ["debug-in-terminal"],
+      "python": "${workspaceFolder}/venv/bin/python",
+      // NOTE: This configuration matches scripts/develop behavior:
+      // - Uses venv Python interpreter (python field above)
+      // - Sets PYTHONPATH to custom_components (env.PYTHONPATH)
+      // - Runs with --debug flag (args)
+      // - Uses config/ directory (args: -c config)
+      // We use "module": "homeassistant" instead of running the script
+      // directly because VS Code needs to attach the debugger to the
+      // Python process for breakpoints to work.
     },
     {
       "name": "Debug Current Test File",
@@ -30,7 +39,8 @@
       ],
       "console": "integratedTerminal",
       "justMyCode": false,
-      "purpose": ["debug-test"]
+      "purpose": ["debug-test"],
+      "python": "${workspaceFolder}/venv/bin/python"
     },
     {
       "name": "Debug All Tests",
@@ -44,7 +54,8 @@
       ],
       "console": "integratedTerminal",
       "justMyCode": false,
-      "purpose": ["debug-test"]
+      "purpose": ["debug-test"],
+      "python": "${workspaceFolder}/venv/bin/python"
     },
     {
       "name": "Debug Specific Test",
@@ -60,7 +71,8 @@
       ],
       "console": "integratedTerminal",
       "justMyCode": false,
-      "purpose": ["debug-test"]
+      "purpose": ["debug-test"],
+      "python": "${workspaceFolder}/venv/bin/python"
     },
     {
       "name": "Debug calculation.py Tests",
@@ -74,7 +86,8 @@
       ],
       "console": "integratedTerminal",
       "justMyCode": false,
-      "purpose": ["debug-test"]
+      "purpose": ["debug-test"],
+      "python": "${workspaceFolder}/venv/bin/python"
     }
   ],
   "inputs": [

@@ -4,4 +4,9 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Activate virtual environment
+if [[ -d "venv" ]]; then
+    source venv/bin/activate
+fi
+
 ruff check . --fix
