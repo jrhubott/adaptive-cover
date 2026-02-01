@@ -188,6 +188,7 @@ git push origin main
 - ✅ ALWAYS ask the user if they want to:
   1. Merge the feature/fix branch back into main
   2. Create a production release
+  3. Create a beta release (without merging to main)
 - Use the AskUserQuestion tool to present these options
 - Wait for user confirmation before proceeding with merge or release
 
@@ -205,7 +206,8 @@ After completing the implementation, ask:
 Options:
 1. Merge to main and create production release
 2. Merge to main only (no release)
-3. Stay on feature branch for more testing
+3. Create a beta release (stay on feature branch)
+4. Stay on feature branch for more testing
 ```
 
 **gh CLI Quick Reference:**
