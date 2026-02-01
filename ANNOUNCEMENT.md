@@ -15,24 +15,41 @@ Automatically control your blinds, awnings, and shutters based on the sun's posi
   - Automatic manual override detection
   - Configurable automation timing and thresholds
   - Support for both position-capable and open/close-only covers
+  - **Position verification and automatic repositioning** 🆕
 - **Advanced Options**:
   - Blind spot configuration for obstacles (trees, buildings)
-  - Min/max position limits
+  - Min/max position limits (with optional direct-sun-only enforcement)
   - Sunrise/sunset offset handling
-  - Diagnostic sensors for troubleshooting
+  - Comprehensive diagnostic sensors for troubleshooting
 
-## 🆕 Recent Improvements (v2.6.1)
+## 🆕 Recent Improvements (v2.6.8 - Latest)
 
-- Significantly expanded test coverage (91% for core calculation logic)
-- Comprehensive developer documentation
-- Enhanced testing infrastructure
-- All 172 automated tests passing
+### Position Verification & Reliability (v2.6.7-2.6.8)
+- ✅ **Periodic position verification** - Automatically detects when covers drift from target position
+- ✅ **Smart repositioning** - Retries with exponential backoff if position doesn't match
+- ✅ **Position mismatch detection** - Binary sensor alerts when covers drift
+- ✅ **Retry tracking** - Monitor verification attempts with statistics
+- ✅ **Fixed critical bugs** - Position verification sensors now work correctly with full statistics support
+
+### Diagnostic & Testing (v2.6.0-2.6.1)
+- ✅ **Comprehensive diagnostic sensors** - 8 diagnostic entities (4 enabled by default, 4 optional)
+  - Last Cover Action, Sun Position, Control Status, Calculated Position
+  - Active Temperature, Climate Conditions, Time Window, Sun Validity
+- ✅ **Expanded test coverage** - 91% coverage for core calculation logic
+- ✅ **Enhanced testing infrastructure** - 178 automated tests passing
+- ✅ **Developer documentation** - 1000+ line comprehensive developer guide
+
+### Configuration & Usability (v2.6.2-2.6.6)
+- ✅ **Enhanced config flow UI** - Clear field descriptions in all supported languages
+- ✅ **Min/max position documentation** - Complete docs for position limit features
+- ✅ **Automated release tooling** - Streamlined release process for faster updates
 
 ## 🚀 Planned Enhancements
 
 - **Manual Override Improvements**: Wait until next manual change option
 - **Unit System Support**: Automatic °F/°C and meter/feet conversions
 - Enhanced climate strategies and automation options
+- Additional diagnostic sensors for advanced troubleshooting
 
 ## 📦 Installation
 
@@ -68,4 +85,4 @@ Have questions or want to share your setup? Join the discussion in this thread!
 
 ---
 
-*Compatible with Home Assistant 2024.5.0+*
+**Latest Version: v2.6.8** | *Compatible with Home Assistant 2024.5.0+ | Python 3.11+*
