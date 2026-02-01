@@ -12,10 +12,11 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_SENSOR_TYPE, DOMAIN
+from .const import CONF_ENABLE_DIAGNOSTICS, CONF_SENSOR_TYPE, DOMAIN
 from .coordinator import AdaptiveDataUpdateCoordinator
 
 
@@ -28,6 +29,8 @@ async def async_setup_entry(
     coordinator: AdaptiveDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]
+
+    entities = []
 
     binary_sensor = AdaptiveCoverBinarySensor(
         config_entry,
@@ -47,7 +50,18 @@ async def async_setup_entry(
         BinarySensorDeviceClass.RUNNING,
         coordinator,
     )
-    async_add_entities([binary_sensor, manual_override])
+    entities.extend([binary_sensor, manual_override])
+
+    # Add diagnostic binary sensors if enabled
+    if config_entry.options.get(CONF_ENABLE_DIAGNOSTICS, False):
+        position_mismatch = AdaptiveCoverPositionMismatchSensor(
+            config_entry,
+            config_entry.entry_id,
+            coordinator,
+        )
+        entities.append(position_mismatch)
+
+    async_add_entities(entities)
 
 
 class AdaptiveCoverBinarySensor(
@@ -103,3 +117,87 @@ class AdaptiveCoverBinarySensor(
     def extra_state_attributes(self) -> Mapping[str, Any] | None:  # noqa: D102
         if self._key == "manual_override":
             return {"manual_controlled": self.coordinator.data.states["manual_list"]}
+
+
+class AdaptiveCoverPositionMismatchSensor(
+    CoordinatorEntity[AdaptiveDataUpdateCoordinator], BinarySensorEntity
+):
+    """Binary sensor indicating if position doesn't match calculated value."""
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_registry_enabled_default = False  # P1 sensor
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(
+        self,
+        config_entry: ConfigEntry,
+        unique_id: str,
+        coordinator: AdaptiveDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the binary sensor."""
+        super().__init__(coordinator=coordinator)
+        self.type = {
+            "cover_blind": "Vertical",
+            "cover_awning": "Horizontal",
+            "cover_tilt": "Tilt",
+        }
+        self._name = config_entry.data["name"]
+        self._device_name = self.type[config_entry.data[CONF_SENSOR_TYPE]]
+        self._attr_unique_id = f"{unique_id}_position_mismatch"
+        self._device_id = unique_id
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=self._name,
+        )
+
+    @property
+    def name(self) -> str:
+        """Name of the entity."""
+        return "Position Mismatch"
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if position mismatch detected."""
+        # Check if any entity has a position mismatch
+        calculated = self.coordinator.state
+
+        for entity_id in self.coordinator._entities:
+            actual = self.coordinator._get_current_position(entity_id)
+
+            if actual is None:
+                continue
+
+            delta = abs(calculated - actual)
+            if delta > self.coordinator._position_tolerance:
+                return True
+
+        return False
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        """Return additional attributes."""
+        calculated = self.coordinator.state
+        attrs = {
+            "calculated_position": calculated,
+            "tolerance": self.coordinator._position_tolerance,
+        }
+
+        # Add per-entity details
+        entity_details = {}
+        for entity_id in self.coordinator._entities:
+            actual = self.coordinator._get_current_position(entity_id)
+            if actual is not None:
+                delta = abs(calculated - actual)
+                entity_details[entity_id] = {
+                    "actual_position": actual,
+                    "position_delta": delta,
+                    "mismatch": delta > self.coordinator._position_tolerance,
+                    "retry_count": self.coordinator._retry_counts.get(entity_id, 0),
+                }
+
+        if entity_details:
+            attrs["entities"] = entity_details
+
+        return attrs

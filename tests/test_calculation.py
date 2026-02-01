@@ -6,15 +6,12 @@ These tests validate the key algorithms without requiring full object instantiat
 
 import pytest
 import numpy as np
-from numpy import cos, sin, tan
+from numpy import cos, tan
 from numpy import radians as rad
 from unittest.mock import MagicMock, patch
 from datetime import datetime
 
 from custom_components.adaptive_cover_pro.calculation import (
-    AdaptiveVerticalCover,
-    AdaptiveHorizontalCover,
-    AdaptiveTiltCover,
     NormalCoverState,
     ClimateCoverData,
     ClimateCoverState,
