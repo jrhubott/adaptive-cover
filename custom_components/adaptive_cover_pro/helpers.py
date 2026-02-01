@@ -1,10 +1,13 @@
 """Helper functions."""
 
 import datetime as dt
+import logging
 
 import pandas as pd
 from dateutil import parser
 from homeassistant.core import HomeAssistant, split_entity_id
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def get_safe_state(hass: HomeAssistant, entity_id: str):
@@ -55,31 +58,62 @@ def dt_check_time_passed(time: dt.datetime):
     return True
 
 
-def check_cover_features(hass: HomeAssistant, entity_id: str) -> dict[str, bool]:
+def check_cover_features(
+    hass: HomeAssistant, entity_id: str
+) -> dict[str, bool] | None:
     """Check which features a cover entity supports.
 
-    Returns dict with keys:
+    Returns:
+        Dict of capabilities if entity is ready, None if not yet initialized
+
+    Dict keys:
     - has_set_position: bool
     - has_set_tilt_position: bool
     - has_open: bool
     - has_close: bool
+
     """
     from homeassistant.components.cover import CoverEntityFeature
+    from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 
     state = hass.states.get(entity_id)
     if not state:
+        _LOGGER.debug("Cover %s state not available yet", entity_id)
+        return None
+
+    # Check if entity is ready
+    if state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        _LOGGER.debug("Cover %s not ready (state: %s)", entity_id, state.state)
+        return None
+
+    # Check if supported_features attribute exists
+    if "supported_features" not in state.attributes:
+        _LOGGER.debug(
+            "Cover %s missing supported_features attribute, assuming position control",
+            entity_id,
+        )
+        # Return optimistic defaults for entities without explicit capabilities
         return {
-            "has_set_position": False,
+            "has_set_position": True,
             "has_set_tilt_position": False,
-            "has_open": False,
-            "has_close": False,
+            "has_open": True,
+            "has_close": True,
         }
 
     supported_features = state.attributes.get("supported_features", 0)
 
+    _LOGGER.debug(
+        "Cover %s supported_features: %s (binary: %s)",
+        entity_id,
+        supported_features,
+        bin(supported_features),
+    )
+
     return {
         "has_set_position": bool(supported_features & CoverEntityFeature.SET_POSITION),
-        "has_set_tilt_position": bool(supported_features & CoverEntityFeature.SET_TILT_POSITION),
+        "has_set_tilt_position": bool(
+            supported_features & CoverEntityFeature.SET_TILT_POSITION
+        ),
         "has_open": bool(supported_features & CoverEntityFeature.OPEN),
         "has_close": bool(supported_features & CoverEntityFeature.CLOSE),
     }

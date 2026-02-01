@@ -194,7 +194,6 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._scheduled_time = dt.datetime.now()
 
         self._cached_options = None
-        self._cover_capabilities: dict[str, dict[str, bool]] = {}  # Cache capabilities per entity
         self._open_close_threshold = self.config_entry.options.get(CONF_OPEN_CLOSE_THRESHOLD, 50)
 
         # Track last cover action for diagnostic sensor
@@ -283,7 +282,16 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.logger.debug("Ignoring intermediate state change for %s", entity_id)
             return
         if self.wait_for_target.get(entity_id):
-            caps = self._cover_capabilities.get(entity_id, {})
+            # Check capabilities on-demand
+            caps = check_cover_features(self.hass, entity_id)
+            if caps is None:
+                # Entity not ready, use safe defaults
+                caps = {
+                    "has_set_position": True,
+                    "has_set_tilt_position": False,
+                    "has_open": True,
+                    "has_close": True,
+                }
 
             # Get position based on capability
             if self._cover_type == "cover_tilt":
@@ -510,7 +518,20 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         if not self.check_position(entity, state):
             return
 
-        caps = self._cover_capabilities.get(entity, {})
+        # Check capabilities on-demand
+        caps = check_cover_features(self.hass, entity)
+        if caps is None:
+            # Entity not ready yet, use safe defaults
+            self.logger.debug(
+                "Cover %s not ready, assuming position control",
+                entity,
+            )
+            caps = {
+                "has_set_position": True,
+                "has_set_tilt_position": False,
+                "has_open": True,
+                "has_close": True,
+            }
 
         # Determine if cover supports position control
         supports_position = False
@@ -518,6 +539,13 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             supports_position = caps.get("has_set_tilt_position", True)
         else:
             supports_position = caps.get("has_set_position", True)
+
+        self.logger.debug(
+            "Cover %s: supports_position=%s, caps=%s",
+            entity,
+            supports_position,
+            caps,
+        )
 
         if supports_position:
             # Use position control (existing behavior)
@@ -581,6 +609,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         self.logger.debug("Run %s with data %s", service, service_data)
         await self.hass.services.async_call(COVER_DOMAIN, service, service_data)
+        self.logger.debug("Successfully called service %s for %s", service, entity)
 
     def _update_options(self, options):
         """Update options."""
@@ -607,18 +636,6 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         if not self._manual_toggle:
             for entity in self.manager.manual_controlled:
                 self.manager.reset(entity)
-        self._ensure_cover_capabilities()
-
-    def _ensure_cover_capabilities(self):
-        """Ensure capabilities are cached for all managed covers."""
-        for entity in self.entities:
-            if entity not in self._cover_capabilities:
-                self._cover_capabilities[entity] = check_cover_features(self.hass, entity)
-                self.logger.debug(
-                    "Cached capabilities for %s: %s",
-                    entity,
-                    self._cover_capabilities[entity],
-                )
 
     def get_blind_data(self, options):
         """Assign correct class for type of blind."""
@@ -713,7 +730,16 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         For position-capable covers, returns current_position or current_tilt_position.
         For open/close-only covers, maps state to 0 (closed) or 100 (open).
         """
-        caps = self._cover_capabilities.get(entity, {})
+        # Check capabilities on-demand
+        caps = check_cover_features(self.hass, entity)
+        if caps is None:
+            # Entity not ready, use safe defaults
+            caps = {
+                "has_set_position": True,
+                "has_set_tilt_position": False,
+                "has_open": True,
+                "has_close": True,
+            }
 
         # Check if cover supports position
         if self._cover_type == "cover_tilt":

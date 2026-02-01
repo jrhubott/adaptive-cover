@@ -283,31 +283,56 @@ def test_check_cover_features_detects_all_features(hass):
 
 
 @pytest.mark.unit
-def test_check_cover_features_returns_false_when_entity_missing(hass):
-    """Test check_cover_features returns all False when entity missing."""
+def test_check_cover_features_returns_none_when_entity_missing(hass):
+    """Test check_cover_features returns None when entity missing."""
     hass.states.get.return_value = None
 
     result = check_cover_features(hass, "cover.nonexistent")
 
-    assert result["has_set_position"] is False
-    assert result["has_set_tilt_position"] is False
-    assert result["has_open"] is False
-    assert result["has_close"] is False
+    assert result is None
 
 
 @pytest.mark.unit
-def test_check_cover_features_returns_false_when_no_features(hass):
-    """Test check_cover_features returns all False when no features set."""
+def test_check_cover_features_returns_optimistic_defaults_when_no_features(hass):
+    """Test check_cover_features returns optimistic defaults when no features attribute."""
     state_obj = MagicMock()
-    state_obj.attributes = {}
+    state_obj.state = "closed"  # Entity is ready
+    state_obj.attributes = {}  # No supported_features attribute
     hass.states.get.return_value = state_obj
 
     result = check_cover_features(hass, "cover.test")
 
-    assert result["has_set_position"] is False
+    # Should return optimistic defaults when entity is ready but has no supported_features
+    assert result["has_set_position"] is True
     assert result["has_set_tilt_position"] is False
-    assert result["has_open"] is False
-    assert result["has_close"] is False
+    assert result["has_open"] is True
+    assert result["has_close"] is True
+
+
+@pytest.mark.unit
+def test_check_cover_features_returns_none_when_unavailable(hass):
+    """Test check_cover_features returns None when entity unavailable."""
+    state_obj = MagicMock()
+    state_obj.state = "unavailable"
+    state_obj.attributes = {"supported_features": 15}
+    hass.states.get.return_value = state_obj
+
+    result = check_cover_features(hass, "cover.test")
+
+    assert result is None
+
+
+@pytest.mark.unit
+def test_check_cover_features_returns_none_when_unknown(hass):
+    """Test check_cover_features returns None when entity unknown."""
+    state_obj = MagicMock()
+    state_obj.state = "unknown"
+    state_obj.attributes = {"supported_features": 15}
+    hass.states.get.return_value = state_obj
+
+    result = check_cover_features(hass, "cover.test")
+
+    assert result is None
 
 
 @pytest.mark.unit
