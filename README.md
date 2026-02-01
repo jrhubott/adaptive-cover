@@ -90,7 +90,14 @@ If you're interested in contributing to this project, please see the **[Developm
   - Optional return to default position when automatic control is disabled
   - Set start time to prevent opening blinds while you are asleep
   - Set minimum interval time between position changes
-  - set minimum percentage change
+  - Set minimum percentage change
+  - **Automatic Position Verification** (built-in reliability feature)
+    - Periodically verifies covers reach their target positions (every 2 minutes)
+    - Automatically retries failed position commands (up to 3 attempts)
+    - Detects position mismatches (3% tolerance)
+    - Respects manual override detection
+    - No configuration required - works automatically when automatic control is enabled
+    - Diagnostic sensors available for troubleshooting cover movement issues
 
 - **Diagnostic Sensors** (Optional, disabled by default)
   - Real-time troubleshooting sensors to understand integration behavior
@@ -100,6 +107,7 @@ If you're interested in contributing to this project, please see the **[Developm
     - Calculated position (before adjustments)
     - Last cover action (tracks most recent cover action with full details)
   - Priority 1 sensors (disabled by default, enable individually):
+    - Position verification tracking (last check time, retry counts, mismatch detection)
     - Active temperature (climate mode only)
     - Climate conditions (climate mode only)
     - Time window status
@@ -510,12 +518,15 @@ These sensors are created when diagnostics are enabled in automation settings. T
 | `sensor.{device_name}_control_status` | Enabled | Shows why covers aren't moving: `active`, `outside_time_window`, `manual_override`, `automatic_control_off`, `sun_not_visible`, etc. |
 | `sensor.{device_name}_calculated_position` | Enabled | Raw calculated position before interpolation/inversion adjustments. |
 | `sensor.{device_name}_last_cover_action` | Enabled | Tracks the most recent cover action: service called, entity controlled, timestamp. Attributes include position sent, threshold used (for open/close-only covers), and whether inverse_state was applied. Useful for debugging. |
+| `sensor.{device_name}_last_position_verification` | Disabled | Timestamp of the last position verification check. Attributes show per-entity verification times. |
+| `sensor.{device_name}_position_verification_retries` | Disabled | Current retry count for position verification (0-3). Attributes show max retries, retries remaining, and per-entity counts. Helps identify covers that repeatedly fail to reach target positions. |
+| `binary_sensor.{device_name}_position_mismatch` | Disabled | Indicates position mismatch between calculated and actual position (problem class). Attributes show calculated position, actual position per entity, position delta, and retry counts. Useful for troubleshooting cover movement issues. |
 | `sensor.{device_name}_active_temperature` | Disabled | Currently active temperature value (climate mode only). Shows which sensor is used. Enable manually if needed. |
 | `sensor.{device_name}_climate_conditions` | Disabled | Climate mode state (Summer Mode, Winter Mode, Intermediate) with condition flags as attributes (climate mode only). Enable manually if needed. |
 | `sensor.{device_name}_time_window` | Disabled | Time window status (Active/Outside Window) with time details as attributes. Enable manually if needed. |
 | `sensor.{device_name}_sun_validity` | Disabled | Sun validity status (Valid, In Blind Spot, Invalid Elevation) with validation details as attributes. Enable manually if needed. |
 
-**Note:** Priority 1 sensors (last 4) are created disabled by default to reduce entity overhead. Enable them individually in the entity list if needed for troubleshooting.
+**Note:** Priority 1 sensors (last 7) are created disabled by default to reduce entity overhead. Enable them individually in the entity list if needed for troubleshooting.
 
 ![entities](https://github.com/jrhubott/adaptive-cover/blob/main/images/entities.png)
 
