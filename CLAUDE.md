@@ -70,9 +70,11 @@ git checkout -b fix/climate-mode-bug
 - ❌ Make commits directly to `main` branch
 - ❌ Start coding before creating a feature branch
 - ❌ Skip feature branches "because it's a small change"
+- ❌ Branch from another feature branch
 
 **ALWAYS:**
 - ✅ Create a feature branch FIRST (before any edits)
+- ✅ **Create feature branches from `main` branch ONLY** (never from other feature branches)
 - ✅ Use descriptive branch names (feature/*, fix/*, docs/*)
 - ✅ Keep commits atomic and focused
 - ✅ Test changes on the feature branch
@@ -116,11 +118,11 @@ git commit -m "descriptive message"
 ### Example Workflow
 
 ```bash
-# 1. Start with main branch
+# 1. Start with main branch (ALWAYS branch from main)
 git checkout main
 git pull origin main
 
-# 2. Create feature branch
+# 2. Create feature branch FROM main
 git checkout -b feature/my-new-feature
 
 # 3. Make changes and commit
@@ -160,6 +162,15 @@ This applies to ALL commits (regular commits, merge commits, etc.). Claude attri
 **Note:** Release notes are also affected by this policy - see the Release Process section below for specific guidance on release notes formatting.
 
 ### Release
+
+**CRITICAL: Only create releases when explicitly requested by the user.**
+- ❌ NEVER create a release proactively or automatically
+- ❌ NEVER assume a release is needed after completing work
+- ✅ ONLY create releases when the user explicitly asks for one
+- ✅ Wait for direct instruction: "create a release", "make a beta", etc.
+
+This applies to ALL release types (beta, patch, minor, major).
+
 ```bash
 ./scripts/release              # Create a release (interactive)
 ./scripts/release beta         # Create beta release (auto-increment)
