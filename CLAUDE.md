@@ -293,6 +293,39 @@ Each platform file registers entities with Home Assistant:
 - `binary_sensor.py` - Sun visibility, manual override status
 - `button.py` - Manual override reset
 
+#### Diagnostic Sensor Guidelines
+
+**IMPORTANT:** When creating diagnostic sensors, prevent logbook/activity feed clutter by excluding them from Home Assistant's activity tracking.
+
+**Pattern for Diagnostic Sensors:**
+```python
+class MyDiagnosticSensor(AdaptiveCoverDiagnosticSensor):
+    """Diagnostic sensor description."""
+
+    # Set empty unit_of_measurement to exclude from logbook
+    _attr_native_unit_of_measurement = ""  # Prevents activity log entries
+
+    # For P0 sensors (basic diagnostics), override parent to enable by default
+    _attr_entity_registry_enabled_default = True  # Optional: only for P0 sensors
+```
+
+**Why This Matters:**
+- Diagnostic sensors update frequently (every calculation cycle, cover action, etc.)
+- Without `unit_of_measurement`, Home Assistant includes them in logbook by default
+- This creates excessive clutter in the activity/logbook feed
+- Setting empty string `""` triggers Home Assistant's logbook exclusion
+- History is still recorded for debugging purposes
+
+**When to Apply:**
+- ✅ All diagnostic sensors that show operational data (last action, status, etc.)
+- ✅ Sensors that update frequently (multiple times per hour)
+- ✅ Sensors showing technical/debugging information
+- ❌ User-facing sensors that represent meaningful state changes (control method, position)
+
+**Examples:**
+- `AdaptiveCoverLastActionSensor` - Shows last cover action (updates every action)
+- Future diagnostic sensors - Active temperature, climate conditions, time windows
+
 ### Supporting Modules
 
 - `sun.py` - Solar data using Astral library (azimuth, elevation, sunrise/sunset)
