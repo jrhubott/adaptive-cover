@@ -550,6 +550,7 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
 
         Returns:
             Safety margin multiplier (1.0 to 1.45)
+
         """
         margin = 1.0
 
@@ -581,6 +582,7 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
             Tuple of (is_edge_case: bool, position: float)
             - is_edge_case: True if edge case detected
             - position: Safe fallback position (only valid if is_edge_case=True)
+
         """
         # Very low elevation: sun nearly horizontal, full coverage safest
         if self.sol_elev < 2.0:
@@ -608,6 +610,7 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
 
         Returns:
             Blind height in meters (0 to h_win)
+
         """
         # Check edge cases first
         is_edge_case, edge_position = self._handle_edge_cases()
