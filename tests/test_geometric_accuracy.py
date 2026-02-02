@@ -428,6 +428,145 @@ class TestRegressionNormalAngles:
             )
 
 
+class TestWindowDepth:
+    """Test window depth parameter functionality."""
+
+    def test_window_depth_default_zero(self, base_cover_params):
+        """Window depth should default to 0 (disabled)."""
+        cover = make_cover_with_angles(base_cover_params, gamma=0.0, sol_elev=45.0)
+        assert cover.window_depth == 0.0
+
+    def test_window_depth_disabled_matches_baseline(self, base_cover_params):
+        """Window depth=0 should match baseline behavior exactly."""
+        # Configure with window_depth explicitly set to 0
+        cover_no_depth = make_cover_with_angles(base_cover_params, gamma=30.0, sol_elev=45.0)
+
+        # Configure with window_depth parameter
+        params_with_depth = base_cover_params.copy()
+        params_with_depth["window_depth"] = 0.0
+        cover_with_zero_depth = AdaptiveVerticalCover(**params_with_depth)
+        cover_with_zero_depth.sol_azi = gamma_to_sol_azi(cover_with_zero_depth.win_azi, 30.0)
+        cover_with_zero_depth.sol_elev = 45.0
+
+        pos_no_depth = cover_no_depth.calculate_position()
+        pos_zero_depth = cover_with_zero_depth.calculate_position()
+
+        assert abs(pos_no_depth - pos_zero_depth) < 1e-10
+
+    def test_window_depth_increases_position_at_angles(self, base_cover_params):
+        """Window depth should increase position at angled sun positions."""
+        # Test at gamma=45 where depth effect is significant
+        params_no_depth = base_cover_params.copy()
+        params_no_depth["window_depth"] = 0.0
+        cover_no_depth = make_cover_with_angles(params_no_depth, gamma=45.0, sol_elev=45.0)
+
+        params_with_depth = base_cover_params.copy()
+        params_with_depth["window_depth"] = 0.10  # 10cm window depth
+        cover_with_depth = AdaptiveVerticalCover(**params_with_depth)
+        cover_with_depth.sol_azi = gamma_to_sol_azi(cover_with_depth.win_azi, 45.0)
+        cover_with_depth.sol_elev = 45.0
+
+        pos_no_depth = cover_no_depth.calculate_position()
+        pos_with_depth = cover_with_depth.calculate_position()
+
+        # With window depth, position should be higher (more protective)
+        assert pos_with_depth > pos_no_depth
+
+    def test_window_depth_no_effect_at_low_gamma(self, base_cover_params):
+        """Window depth should have minimal effect at gamma < 10°."""
+        params_no_depth = base_cover_params.copy()
+        params_no_depth["window_depth"] = 0.0
+        cover_no_depth = make_cover_with_angles(params_no_depth, gamma=5.0, sol_elev=45.0)
+
+        params_with_depth = base_cover_params.copy()
+        params_with_depth["window_depth"] = 0.10
+        cover_with_depth = AdaptiveVerticalCover(**params_with_depth)
+        cover_with_depth.sol_azi = gamma_to_sol_azi(cover_with_depth.win_azi, 5.0)
+        cover_with_depth.sol_elev = 45.0
+
+        pos_no_depth = cover_no_depth.calculate_position()
+        pos_with_depth = cover_with_depth.calculate_position()
+
+        # Difference should be negligible at low gamma
+        assert abs(pos_with_depth - pos_no_depth) < 0.01  # Less than 1cm difference
+
+    def test_window_depth_effect_increases_with_gamma(self, base_cover_params):
+        """Window depth effect should increase with larger gamma angles."""
+        params = base_cover_params.copy()
+        params["window_depth"] = 0.10
+
+        positions = []
+        for gamma in [10.0, 30.0, 50.0, 70.0]:
+            cover = AdaptiveVerticalCover(**params)
+            cover.sol_azi = gamma_to_sol_azi(cover.win_azi, gamma)
+            cover.sol_elev = 45.0
+            positions.append(cover.calculate_position())
+
+        # Each position should be higher than the previous (more depth effect)
+        for i in range(len(positions) - 1):
+            assert positions[i] < positions[i + 1], (
+                f"Position should increase with gamma"
+            )
+
+    def test_window_depth_realistic_values(self, base_cover_params):
+        """Test with realistic window depth values."""
+        test_depths = [
+            (0.05, "flush mount"),
+            (0.10, "standard frame"),
+            (0.15, "deep reveal"),
+        ]
+
+        params = base_cover_params.copy()
+        for depth, description in test_depths:
+            params["window_depth"] = depth
+            cover = AdaptiveVerticalCover(**params)
+            cover.sol_azi = gamma_to_sol_azi(cover.win_azi, 45.0)
+            cover.sol_elev = 45.0
+
+            position = cover.calculate_position()
+
+            # All should be valid positions
+            assert 0 <= position <= cover.h_win, (
+                f"Invalid position for {description}: {position}"
+            )
+
+    def test_window_depth_backward_compatibility(self, hass, mock_logger):
+        """Cover without window_depth parameter should work (backward compatibility)."""
+        # Create cover without window_depth parameter (old code style)
+        cover = AdaptiveVerticalCover(
+            hass=hass,
+            logger=mock_logger,
+            sol_azi=180.0,
+            sol_elev=45.0,
+            sunset_pos=0,
+            sunset_off=0,
+            sunrise_off=0,
+            timezone="UTC",
+            fov_left=90,
+            fov_right=90,
+            win_azi=180,
+            h_def=50,
+            max_pos=100,
+            min_pos=0,
+            max_pos_bool=False,
+            min_pos_bool=False,
+            blind_spot_left=None,
+            blind_spot_right=None,
+            blind_spot_elevation=None,
+            blind_spot_on=False,
+            min_elevation=None,
+            max_elevation=None,
+            distance=0.5,
+            h_win=2.1,
+            # window_depth omitted - should use default
+        )
+
+        # Should work and use default
+        assert cover.window_depth == 0.0
+        position = cover.calculate_position()
+        assert 0 <= position <= cover.h_win
+
+
 class TestSmoothTransitions:
     """Test that transitions are smooth across angle ranges."""
 
