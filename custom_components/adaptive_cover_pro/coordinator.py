@@ -225,6 +225,12 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._position_tolerance = POSITION_TOLERANCE_PERCENT
         self._max_retries = MAX_POSITION_RETRIES
 
+        # Track entities that have never received commands (for cleaner logging)
+        self._never_commanded: set[str] = set()
+
+        # Track time window state transitions (for responsive end time handling)
+        self._last_time_window_state: bool | None = None
+
     def _get_cover_capabilities(self, entity: str) -> dict[str, bool]:
         """Get cover capabilities with fallback to safe defaults.
 
@@ -303,7 +309,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.logger.debug("Checking timed refresh. End time: %s, now: %s", time, now)
 
         time_check = now - get_datetime_from_str(time)
-        if time is not None and (time_check <= dt.timedelta(seconds=1)):
+        if time is not None and (time_check <= dt.timedelta(seconds=5)):
             self.timed_refresh = True
             self.logger.debug("Timed refresh triggered")
             await self.async_refresh()
@@ -544,12 +550,19 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         """Handle first refresh."""
         if self.automatic_control:
             for cover in self.entities:
-                if (
-                    self.check_adaptive_time
-                    and not self.manager.is_cover_manual(cover)
-                    and self.check_position_delta(cover, state, options)
-                ):
-                    await self.async_set_position(cover, state)
+                # Always set target position for verification, even if we don't send command
+                # This ensures position verification works after restart
+                if self.check_adaptive_time and not self.manager.is_cover_manual(cover):
+                    self.target_call[cover] = state
+                    self.logger.debug(
+                        "First refresh: Set target position %s for %s",
+                        state,
+                        cover
+                    )
+
+                    # Now check if we should actually send the command
+                    if self.check_position_delta(cover, state, options):
+                        await self.async_set_position(cover, state)
         else:
             self.logger.debug("First refresh but control toggle is off")
         self.first_refresh = False
@@ -631,6 +644,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
             self.wait_for_target[entity] = True
             self.target_call[entity] = state
+            self._never_commanded.discard(entity)  # Remove from never-commanded tracking
             self.logger.debug(
                 "Set wait for target %s and target call %s",
                 self.wait_for_target,
@@ -652,9 +666,11 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             if state >= self._open_close_threshold:
                 service = "open_cover"
                 self.target_call[entity] = 100
+                self._never_commanded.discard(entity)  # Remove from never-commanded tracking
             else:
                 service = "close_cover"
                 self.target_call[entity] = 0
+                self._never_commanded.discard(entity)  # Remove from never-commanded tracking
 
             service_data = {ATTR_ENTITY_ID: entity}
             self.wait_for_target[entity] = True
@@ -1219,8 +1235,41 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     def return_to_default_toggle(self, value):
         self._return_to_default_toggle = value
 
+    async def _check_time_window_transition(self, now: dt.datetime) -> None:
+        """Check if time window state has changed and trigger refresh if needed.
+
+        This method detects when the operational time window changes state
+        (e.g., when end time is reached) and triggers appropriate actions.
+        Provides <2 minute response time for time window changes.
+        """
+        # Initialize tracking on first call
+        if self._last_time_window_state is None:
+            self._last_time_window_state = self.check_adaptive_time
+            return
+
+        current_state = self.check_adaptive_time
+
+        # If state changed, trigger appropriate action
+        if current_state != self._last_time_window_state:
+            self.logger.info(
+                "Time window state changed: %s → %s",
+                "active" if self._last_time_window_state else "inactive",
+                "active" if current_state else "inactive"
+            )
+            self._last_time_window_state = current_state
+
+            # If we just left the time window, return covers to default position
+            if not current_state and self._track_end_time:
+                self.logger.info("End time reached, returning covers to default position")
+                self.timed_refresh = True
+                await self.async_refresh()
+
     async def async_periodic_position_check(self, now: dt.datetime) -> None:
         """Periodically verify cover positions match calculated positions."""
+        # Check if time window state changed (e.g., passed end time)
+        # This provides <2 minute response time for time window changes
+        await self._check_time_window_transition(now)
+
         # Skip if not within operational time window
         if not self.check_adaptive_time:
             return
@@ -1250,8 +1299,13 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         # Get target position (the position we last sent to this cover)
         target_position = self.target_call.get(entity_id)
         if target_position is None:
-            # No command has been sent yet, nothing to verify
-            self.logger.debug("No target position set for %s, skipping verification", entity_id)
+            # Only log once when first encountered to avoid log spam
+            if entity_id not in self._never_commanded:
+                self._never_commanded.add(entity_id)
+                self.logger.debug(
+                    "No command sent to %s yet, position verification will begin after first command",
+                    entity_id
+                )
             return
 
         # Get actual position
