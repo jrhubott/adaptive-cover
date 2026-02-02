@@ -232,6 +232,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         # Track time window state transitions (for responsive end time handling)
         self._last_time_window_state: bool | None = None
 
+        # Track sun validity transitions (for responsive sun in-front detection)
+        self._last_sun_validity_state: bool | None = None
+
     def _get_cover_capabilities(self, entity: str) -> dict[str, bool]:
         """Get cover capabilities with fallback to safe defaults.
 
@@ -868,10 +871,30 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         return self._read_position_with_capabilities(entity, caps)
 
     def check_position(self, entity, state):
-        """Check if position is different as state."""
+        """Check if position is different as state.
+
+        Bypasses check if sun just came into field of view to ensure
+        covers reposition even if calculated position equals current position
+        (can happen when min/max limits clamp low-angle calculations).
+        """
         position = self._get_current_position(entity)
         if position is not None:
+            # Check if sun just came into field of view
+            sun_just_appeared = self._check_sun_validity_transition()
+
+            if sun_just_appeared:
+                self.logger.debug(
+                    "Bypassing position equality check: sun just came into field of view "
+                    "(entity: %s, position: %s, state: %s)",
+                    entity,
+                    position,
+                    state
+                )
+                return True  # Force repositioning on sun visibility transition
+
+            # Normal check: only move if position changed
             return position != state
+
         self.logger.debug("Cover is already at position %s", state)
         return False
 
@@ -1281,6 +1304,36 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self.logger.info("End time reached, returning covers to default position")
                 self.timed_refresh = True
                 await self.async_refresh()
+
+    def _check_sun_validity_transition(self) -> bool:
+        """Check if sun validity state has changed from False to True.
+
+        Returns True if sun just came into field of view, indicating
+        covers should immediately reposition regardless of delta checks.
+        """
+        # Need cover data to check sun validity
+        if not hasattr(self, 'normal_cover_state') or self.normal_cover_state is None:
+            return False
+
+        current_sun_valid = self.normal_cover_state.cover.direct_sun_valid
+
+        # Initialize tracking on first call
+        if self._last_sun_validity_state is None:
+            self._last_sun_validity_state = current_sun_valid
+            return False
+
+        # Detect transition from not-in-front to in-front
+        sun_just_appeared = (not self._last_sun_validity_state) and current_sun_valid
+
+        # Update tracking
+        self._last_sun_validity_state = current_sun_valid
+
+        if sun_just_appeared:
+            self.logger.info(
+                "Sun visibility transition detected: OFF → ON (sun came into field of view)"
+            )
+
+        return sun_just_appeared
 
     async def async_periodic_position_check(self, now: dt.datetime) -> None:
         """Periodically verify cover positions match calculated positions."""
