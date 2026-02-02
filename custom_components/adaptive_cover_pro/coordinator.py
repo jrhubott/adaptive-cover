@@ -193,6 +193,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.climate_data = None  # Store climate_data for P1 diagnostics
         self.control_method = "intermediate"
         self.state_change_data: StateChangedData | None = None
+        self.raw_calculated_position = 0  # Store raw position for diagnostics
         self.manager = AdaptiveCoverManager(self.hass, self.manual_duration, self.logger)
         self.wait_for_target = {}
         self.target_call = {}
@@ -418,6 +419,17 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         self.default_state = round(self.normal_cover_state.get_state())
         self.logger.debug("Determined default state to be %s", self.default_state)
+
+        # Store raw calculated position for diagnostics (before min/max limits)
+        # This is the pure geometric calculation
+        if cover_data.direct_sun_valid:
+            # Sun is in front - use raw calculated percentage
+            self.raw_calculated_position = round(cover_data.calculate_percentage())
+        else:
+            # Sun not in front - use default position (no calculation)
+            self.raw_calculated_position = cover_data.default
+        self.logger.debug("Raw calculated position: %s", self.raw_calculated_position)
+
         return self.state
 
     async def _update_solar_times_if_needed(self, normal_cover) -> tuple[dt.datetime, dt.datetime]:
@@ -868,8 +880,18 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         position = self._get_current_position(entity)
         if position is not None:
             condition = abs(position - state) >= self.min_change
+
+            # Get special positions for comparison
+            default_height = options.get(CONF_DEFAULT_HEIGHT)
+            sunset_pos = options.get(CONF_SUNSET_POS)
+            special_positions = [0, 100]
+            if default_height is not None:
+                special_positions.append(default_height)
+            if sunset_pos is not None:
+                special_positions.append(sunset_pos)
+
             self.logger.debug(
-                "Entity: %s,  position: %s, state: %s, delta position: %s, min_change: %s, condition: %s",
+                "Entity: %s, position: %s, state: %s, delta position: %s, min_change: %s, condition: %s",
                 entity,
                 position,
                 state,
@@ -877,13 +899,24 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self.min_change,
                 condition,
             )
-            if state in [
-                options.get(CONF_SUNSET_POS),
-                options.get(CONF_DEFAULT_HEIGHT),
-                0,
-                100,
-            ]:
+
+            # Bypass delta check when moving TO special positions (existing logic)
+            if state in special_positions:
+                self.logger.debug(
+                    "Bypassing delta check: moving TO special position %s", state
+                )
                 condition = True
+
+            # Bypass delta check when moving FROM special positions (NEW logic)
+            # This ensures covers reposition when sun transitions from "not in front" to "in front"
+            elif position in special_positions:
+                self.logger.debug(
+                    "Bypassing delta check: moving FROM special position %s to calculated position %s",
+                    position,
+                    state
+                )
+                condition = True
+
             return condition
         return True
 
@@ -1011,7 +1044,10 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     def _build_position_diagnostics(self) -> dict:
         """Build calculated position diagnostics."""
         diagnostics = {}
-        diagnostics["calculated_position"] = self.default_state
+
+        # Use raw calculated position (before min/max limits) for diagnostic
+        diagnostics["calculated_position"] = self.raw_calculated_position
+
         if self.climate_state is not None:
             diagnostics["calculated_position_climate"] = self.climate_state
 
