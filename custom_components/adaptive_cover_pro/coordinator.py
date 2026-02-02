@@ -61,6 +61,7 @@ from .const import (
     CONF_DELTA_POSITION,
     CONF_DELTA_TIME,
     CONF_DISTANCE,
+    CONF_WINDOW_DEPTH,
     CONF_ENABLE_BLIND_SPOT,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_MAX_POSITION,
@@ -954,6 +955,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         return [
             options.get(CONF_DISTANCE),
             options.get(CONF_HEIGHT_WIN),
+            options.get(CONF_WINDOW_DEPTH, 0.0),  # Default 0.0 for backward compatibility
         ]
 
     def horizontal_data(self, options):
