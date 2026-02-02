@@ -23,3 +23,4 @@ API.ipynb
 .github/.DS_Store
 .DS_Store
 notebooks/test_python.ipynb
+.claude/
