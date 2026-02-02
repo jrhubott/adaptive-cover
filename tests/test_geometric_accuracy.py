@@ -34,6 +34,7 @@ def make_cover_with_angles(base_params: dict, gamma: float, sol_elev: float) -> 
 
     Returns:
         AdaptiveVerticalCover instance configured with the specified angles
+
     """
     params = base_params.copy()
     params["sol_azi"] = gamma_to_sol_azi(params["win_azi"], gamma)
@@ -505,7 +506,7 @@ class TestWindowDepth:
         # Each position should be higher than the previous (more depth effect)
         for i in range(len(positions) - 1):
             assert positions[i] < positions[i + 1], (
-                f"Position should increase with gamma"
+                "Position should increase with gamma"
             )
 
     def test_window_depth_realistic_values(self, base_cover_params):
