@@ -61,8 +61,6 @@ If you're interested in contributing to this project, please see the **[Developm
     - [Blindspot](#blindspot)
   - [Entities](#entities)
   - [Features Planned](#features-planned)
-    - [Simulation](#simulation)
-    - [Blueprint (deprecated since v1.0.0)](#blueprint-deprecated-since-v100)
 
 ## Features
 
@@ -743,8 +741,6 @@ These sensors are created when diagnostics are enabled in automation settings. T
 
 **Note:** Priority 1 sensors (last 7) are created disabled by default to reduce entity overhead. Enable them individually in the entity list if needed for troubleshooting.
 
-![entities](https://github.com/jrhubott/adaptive-cover/blob/main/images/entities.png)
-
 ## Features Planned
 
 - Manual override controls
@@ -759,11 +755,4 @@ These sensors are created when diagnostics are enabled in automation settings. T
 
 - ~~Algorithm to control radiation and/or illumination~~
 
-### Simulation
 
-![combined_simulation](custom_components/adaptive_cover/simulation/sim_plot.png)
-
-### Blueprint (deprecated since v1.0.0)
-
-This integration provides the option to download a blueprint to control the covers automatically by the provide sensor.
-By selecting the option the blueprints will be added to your local blueprints folder.
