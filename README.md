@@ -211,6 +211,40 @@ The "Inverse the state" option works with open/close-only covers by inverting th
 
 This allows the integration to support covers with non-standard OPEN/CLOSE behavior that don't follow Home Assistant guidelines. Enable this option if your cover's OPEN and CLOSE commands appear to work backwards.
 
+### Response Time and Control Delays
+
+The integration uses periodic checks to balance responsiveness with system performance. Understanding these timing behaviors helps set appropriate expectations:
+
+**Time Window Transitions (Start/End Times):**
+- When start time or end time is reached, covers will respond within **1 minute**
+- The integration checks time window state every minute and triggers immediate action when transitions occur
+- Log messages will indicate: "Time window state changed: inactive → active" (or vice versa)
+
+**Sun Position Changes:**
+- Sun position changes trigger updates immediately
+- Temperature, weather, and presence sensor changes also trigger immediate updates
+- Delta position and delta time settings control how frequently covers actually move
+
+**After Home Assistant Restart:**
+- Covers are automatically repositioned during first refresh (typically within 30 seconds)
+- Target positions are calculated and stored even if covers don't need to move
+- Position verification begins immediately after first refresh
+
+**Position Verification:**
+- Every minute, the integration verifies covers reached their target positions
+- If a mismatch is detected (e.g., cover failed to move), automatic retry occurs
+- Up to 3 retry attempts before logging a warning
+
+**Why Not Instant?**
+- Periodic checks balance responsiveness with Home Assistant performance
+- Prevents excessive processor usage from continuous monitoring
+- 1-minute intervals are imperceptible for sun-based automation (sun moves slowly)
+- Immediate triggers still available for sun position, temperature, and sensor changes
+
+**Recommendation:**
+- For time-critical automations at specific times, consider using Home Assistant automations that trigger on time patterns instead of relying on start/end times
+- Start/end times are designed for daily operational windows, not precision timing
+
 ## Enhanced Geometric Accuracy
 
 Adaptive Cover Pro includes sophisticated geometric calculations to ensure accurate sun blocking even at extreme sun angles. These improvements work automatically - no configuration required.
