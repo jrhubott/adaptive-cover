@@ -1222,7 +1222,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         This method detects when the operational time window changes state
         (e.g., when end time is reached) and triggers appropriate actions.
-        Provides <2 minute response time for time window changes.
+        Provides <1 minute response time for time window changes.
         """
         # Initialize tracking on first call
         if self._last_time_window_state is None:
@@ -1249,7 +1249,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     async def async_periodic_position_check(self, now: dt.datetime) -> None:
         """Periodically verify cover positions match calculated positions."""
         # Check if time window state changed (e.g., passed end time)
-        # This provides <2 minute response time for time window changes
+        # This provides <1 minute response time for time window changes
         await self._check_time_window_transition(now)
 
         # Skip if not within operational time window

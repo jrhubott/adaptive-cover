@@ -78,7 +78,7 @@ CONF_OPEN_CLOSE_THRESHOLD = "open_close_threshold"
 CONF_ENABLE_DIAGNOSTICS = "enable_diagnostics"
 
 # Position verification constants (fixed values, not configurable)
-POSITION_CHECK_INTERVAL_MINUTES = 2  # Fixed interval for position verification
+POSITION_CHECK_INTERVAL_MINUTES = 1  # Fixed interval for position verification
 POSITION_TOLERANCE_PERCENT = 3  # Fixed tolerance for position matching
 MAX_POSITION_RETRIES = 3  # Maximum retry attempts before giving up
 
