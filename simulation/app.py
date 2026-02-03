@@ -225,17 +225,22 @@ def export(sim_id, format):
 
 
 if __name__ == "__main__":
+    import os
+
     # Create config directory if it doesn't exist
     CONFIG_DIR.mkdir(exist_ok=True)
+
+    # Allow port to be set via environment variable or default to 5000
+    port = int(os.environ.get("FLASK_PORT", 5000))
 
     print("=" * 60)
     print("Adaptive Cover Pro - Simulation Web Application")
     print("=" * 60)
     print()
     print("Starting Flask development server...")
-    print("Access the application at: http://localhost:5000")
+    print(f"Access the application at: http://localhost:{port}")
     print()
     print("Press CTRL+C to stop the server")
     print("=" * 60)
 
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=port)
