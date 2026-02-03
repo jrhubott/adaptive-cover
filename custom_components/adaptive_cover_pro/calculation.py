@@ -407,30 +407,37 @@ class ClimateCoverState(NormalCoverState):
 
         is_summer = self.climate_data.is_summer
 
-        # Check if it's not summer and either lux, irradiance or sunny weather is present
+        # Priority 1: Winter mode for solar heating
+        # If it's winter and sun is in front, open fully regardless of light conditions
+        if self.climate_data.is_winter and self.cover.valid:
+            self.cover.logger.debug(
+                "n_w_p(): Winter mode active with sun in window = use 100 for solar heating"
+            )
+            return 100
+
+        # Priority 2: Low light or non-sunny conditions
+        # If it's not summer and light is low or weather is not sunny, use default
         if not is_summer and (
             self.climate_data.lux
             or self.climate_data.irradiance
             or not self.climate_data.is_sunny
         ):
-            # If it's winter and the cover is valid, return 100
-            if self.climate_data.is_winter and self.cover.valid:
-                self.cover.logger.debug(
-                    "n_w_p(): Winter and sun is in front of window = use 100"
-                )
-                return 100
-            # Otherwise, return the default cover state
             self.cover.logger.debug(
-                "n_w_p(): it's not summer and sunny weather is not present = use default"
+                "n_w_p(): Low light or not sunny = use default position"
             )
             return self.cover.default
 
-        # If it's summer and there's a transparent blind, return 0
+        # Priority 3: Summer with transparent blinds
         if is_summer and self.climate_data.transparent_blind:
+            self.cover.logger.debug(
+                "n_w_p(): Summer with transparent blind = close to 0"
+            )
             return 0
 
-        # If none of the above conditions are met, get the state from the parent class
-        self.cover.logger.debug("n_w_p(): None of the climate conditions are met")
+        # Priority 4: Normal glare calculation
+        self.cover.logger.debug(
+            "n_w_p(): Use calculated position for glare control"
+        )
         return super().get_state()
 
     def normal_without_presence(self) -> int:
@@ -444,15 +451,38 @@ class ClimateCoverState(NormalCoverState):
 
     def tilt_with_presence(self, degrees: int) -> int:
         """Determine state for tilted blinds with occupants."""
-        if self.cover.valid and (
-            self.climate_data.lux
-            or self.climate_data.irradiance
-            or not self.climate_data.is_sunny
-        ):
+
+        # Priority 1: Climate-based decisions when sun is valid
+        if self.cover.valid:
+            # Summer: partial closure for heat blocking
             if self.climate_data.is_summer:
-                # If it's summer, return 45 degrees
+                self.cover.logger.debug(
+                    "tilt_w_p(): Summer mode = 45 degrees"
+                )
                 return 45 / degrees * 100
-            return super().get_state()
+
+            # Winter: Use calculated position for optimal light/heat
+            if self.climate_data.is_winter:
+                self.cover.logger.debug(
+                    "tilt_w_p(): Winter mode = use calculated position"
+                )
+                return super().get_state()
+
+            # Low light or not sunny: Use calculated position
+            if (
+                self.climate_data.lux
+                or self.climate_data.irradiance
+                or not self.climate_data.is_sunny
+            ):
+                self.cover.logger.debug(
+                    "tilt_w_p(): Low light or not sunny = use calculated position"
+                )
+                return super().get_state()
+
+        # Default: 80 degrees (mostly open)
+        self.cover.logger.debug(
+            "tilt_w_p(): Default = 80 degrees"
+        )
         return 80 / degrees * 100
 
     def tilt_without_presence(self, degrees: int) -> int:
