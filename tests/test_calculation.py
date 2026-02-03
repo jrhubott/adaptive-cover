@@ -1920,6 +1920,131 @@ class TestClimateCoverData:
 
         assert climate_data.irradiance is False
 
+    @pytest.mark.unit
+    def test_lux_with_none_value(self, hass, mock_logger):
+        """Test lux property returns False when sensor value is None (unavailable)."""
+        # Mock unavailable sensor (returns None)
+        hass.states.get.return_value = None
+
+        climate_data = ClimateCoverData(
+            hass=hass,
+            logger=mock_logger,
+            temp_entity=None,
+            temp_low=20.0,
+            temp_high=25.0,
+            presence_entity=None,
+            weather_entity=None,
+            weather_condition=["sunny"],
+            outside_entity=None,
+            temp_switch=False,
+            blind_type="cover_blind",
+            transparent_blind=False,
+            lux_entity="sensor.lux",
+            irradiance_entity=None,
+            lux_threshold=5000,
+            irradiance_threshold=300,
+            temp_summer_outside=22.0,
+            _use_lux=True,
+            _use_irradiance=False,
+        )
+
+        # Should return False (condition not met) when sensor unavailable
+        assert climate_data.lux is False
+
+    @pytest.mark.unit
+    def test_irradiance_with_none_value(self, hass, mock_logger):
+        """Test irradiance property returns False when sensor value is None (unavailable)."""
+        # Mock unavailable sensor (returns None)
+        hass.states.get.return_value = None
+
+        climate_data = ClimateCoverData(
+            hass=hass,
+            logger=mock_logger,
+            temp_entity=None,
+            temp_low=20.0,
+            temp_high=25.0,
+            presence_entity=None,
+            weather_entity=None,
+            weather_condition=["sunny"],
+            outside_entity=None,
+            temp_switch=False,
+            blind_type="cover_blind",
+            transparent_blind=False,
+            lux_entity=None,
+            irradiance_entity="sensor.solar",
+            lux_threshold=5000,
+            irradiance_threshold=300,
+            temp_summer_outside=22.0,
+            _use_lux=False,
+            _use_irradiance=True,
+        )
+
+        # Should return False (condition not met) when sensor unavailable
+        assert climate_data.irradiance is False
+
+    @pytest.mark.unit
+    def test_get_current_temperature_with_none_values(self, hass, mock_logger):
+        """Test get_current_temperature returns None when all sensors unavailable."""
+        # Mock unavailable sensors (returns None)
+        hass.states.get.return_value = None
+
+        climate_data = ClimateCoverData(
+            hass=hass,
+            logger=mock_logger,
+            temp_entity="sensor.inside_temp",
+            temp_low=20.0,
+            temp_high=25.0,
+            presence_entity=None,
+            weather_entity=None,
+            weather_condition=["sunny"],
+            outside_entity="sensor.outside_temp",
+            temp_switch=True,
+            blind_type="cover_blind",
+            transparent_blind=False,
+            lux_entity=None,
+            irradiance_entity=None,
+            lux_threshold=5000,
+            irradiance_threshold=300,
+            temp_summer_outside=22.0,
+            _use_lux=False,
+            _use_irradiance=False,
+        )
+
+        # Should return None when no temperature available
+        temp = climate_data.get_current_temperature
+        assert temp is None
+
+    @pytest.mark.unit
+    def test_outside_high_with_none_value(self, hass, mock_logger):
+        """Test outside_high returns True (default) when outside temp is None."""
+        # Mock unavailable sensor (returns None)
+        hass.states.get.return_value = None
+
+        climate_data = ClimateCoverData(
+            hass=hass,
+            logger=mock_logger,
+            temp_entity=None,
+            temp_low=20.0,
+            temp_high=25.0,
+            presence_entity=None,
+            weather_entity=None,
+            weather_condition=["sunny"],
+            outside_entity="sensor.outside_temp",
+            temp_switch=False,
+            blind_type="cover_blind",
+            transparent_blind=False,
+            lux_entity=None,
+            irradiance_entity=None,
+            lux_threshold=5000,
+            irradiance_threshold=300,
+            temp_summer_outside=30.0,
+            _use_lux=False,
+            _use_irradiance=False,
+        )
+
+        # Should return True (default behavior) when sensor unavailable
+        assert climate_data.outside_high is True
+
 
 # ============================================================================
 # Phase 5: ClimateCoverState Tests

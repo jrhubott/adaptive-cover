@@ -279,13 +279,14 @@ class ClimateCoverData:
             return temp
 
     @property
-    def get_current_temperature(self) -> float:
+    def get_current_temperature(self) -> float | None:
         """Get temperature."""
         if self.temp_switch:
-            if self.outside_temperature:
+            if self.outside_temperature is not None:
                 return float(self.outside_temperature)
-        if self.inside_temperature:
+        if self.inside_temperature is not None:
             return float(self.inside_temperature)
+        return None
 
     @property
     def is_presence(self):
@@ -323,11 +324,10 @@ class ClimateCoverData:
     @property
     def outside_high(self) -> bool:
         """Check if outdoor temperature is above threshold."""
-        if (
-            self.temp_summer_outside is not None
-            and self.outside_temperature is not None
-        ):
-            return float(self.outside_temperature) > self.temp_summer_outside
+        if self.temp_summer_outside is not None:
+            temp = self.outside_temperature
+            if temp is not None:
+                return float(temp) > self.temp_summer_outside
         return True
 
     @property
@@ -368,6 +368,8 @@ class ClimateCoverData:
             return False
         if self.lux_entity is not None and self.lux_threshold is not None:
             value = get_safe_state(self.hass, self.lux_entity)
+            if value is None:
+                return False
             return float(value) <= self.lux_threshold
         return False
 
@@ -378,6 +380,8 @@ class ClimateCoverData:
             return False
         if self.irradiance_entity is not None and self.irradiance_threshold is not None:
             value = get_safe_state(self.hass, self.irradiance_entity)
+            if value is None:
+                return False
             return float(value) <= self.irradiance_threshold
         return False
 
