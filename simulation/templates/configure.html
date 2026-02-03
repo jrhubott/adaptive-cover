@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}Configure Profile - Adaptive Cover Pro Simulation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>{% if profile %}Edit{% else %}Create{% endif %} Profile</h1>
+        <p class="lead">Configure cover parameters for simulation.</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-10 col-lg-8">
+        <form action="{{ url_for('configure') }}" method="post" id="configForm">
+            <!-- Profile ID and Name -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Basic Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="profile_id" class="form-label">Profile ID</label>
+                        <input type="text" class="form-control" id="profile_id" name="profile_id"
+                               value="{{ profile_id or '' }}" required
+                               pattern="[a-z0-9_]+" title="Lowercase letters, numbers, and underscores only"
+                               {% if profile %}readonly{% endif %}>
+                        <small class="form-text text-muted">Unique identifier (lowercase, no spaces)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Profile Name</label>
+                        <input type="text" class="form-control" id="name" name="name"
+                               value="{{ profile.name if profile else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="cover_type" class="form-label">Cover Type</label>
+                        <select class="form-select" id="cover_type" name="cover_type" required>
+                            <option value="cover_blind" {% if profile and profile.cover_type == 'cover_blind' %}selected{% endif %}>Vertical Blind</option>
+                            <option value="cover_awning" {% if profile and profile.cover_type == 'cover_awning' %}selected{% endif %}>Horizontal Awning</option>
+                            <option value="cover_tilt" {% if profile and profile.cover_type == 'cover_tilt' %}selected{% endif %}>Tilt/Venetian Blind</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Location</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="latitude" class="form-label">Latitude</label>
+                            <input type="number" step="0.000001" class="form-control" id="latitude" name="latitude"
+                                   value="{{ profile.latitude if profile else '51.8' }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="longitude" class="form-label">Longitude</label>
+                            <input type="number" step="0.000001" class="form-control" id="longitude" name="longitude"
+                                   value="{{ profile.longitude if profile else '5.8' }}" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="timezone" class="form-label">Timezone</label>
+                        <input type="text" class="form-control" id="timezone" name="timezone"
+                               value="{{ profile.timezone if profile else 'Europe/Amsterdam' }}" required>
+                        <small class="form-text text-muted">e.g., Europe/Amsterdam, America/New_York</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Window Configuration -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Window Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="window_azimuth" class="form-label">Window Azimuth (°)</label>
+                        <input type="number" step="0.1" class="form-control" id="window_azimuth" name="window_azimuth"
+                               value="{{ profile.window_azimuth if profile else '180' }}" required>
+                        <small class="form-text text-muted">0° = North, 90° = East, 180° = South, 270° = West</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="fov_left" class="form-label">Field of View Left (°)</label>
+                            <input type="number" step="0.1" class="form-control" id="fov_left" name="fov_left"
+                                   value="{{ profile.fov_left if profile else '90' }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="fov_right" class="form-label">Field of View Right (°)</label>
+                            <input type="number" step="0.1" class="form-control" id="fov_right" name="fov_right"
+                                   value="{{ profile.fov_right if profile else '90' }}" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cover-Specific Parameters -->
+            <div class="card mb-3" id="vertical_params" style="display: none;">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Vertical Blind Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="window_height" class="form-label">Window Height (m)</label>
+                        <input type="number" step="0.01" class="form-control" name="window_height"
+                               value="{{ profile.window_height if profile else '2.1' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="distance" class="form-label">Distance to Work Plane (m)</label>
+                        <input type="number" step="0.01" class="form-control" name="distance"
+                               value="{{ profile.distance if profile else '0.5' }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3" id="awning_params" style="display: none;">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Horizontal Awning Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="length" class="form-label">Awning Length (m)</label>
+                        <input type="number" step="0.01" class="form-control" name="length"
+                               value="{{ profile.length if profile else '2.1' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="angle" class="form-label">Awning Angle (°)</label>
+                        <input type="number" step="0.1" class="form-control" name="angle"
+                               value="{{ profile.angle if profile else '0' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="window_height" class="form-label">Window Height (m)</label>
+                        <input type="number" step="0.01" class="form-control" name="window_height"
+                               value="{{ profile.window_height if profile else '2.1' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="distance" class="form-label">Distance to Window (m)</label>
+                        <input type="number" step="0.01" class="form-control" name="distance"
+                               value="{{ profile.distance if profile else '0.5' }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3" id="tilt_params" style="display: none;">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Tilt/Venetian Blind Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="slat_depth" class="form-label">Slat Depth (cm)</label>
+                        <input type="number" step="0.1" class="form-control" name="slat_depth"
+                               value="{{ profile.slat_depth if profile else '3' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="slat_distance" class="form-label">Slat Distance (cm)</label>
+                        <input type="number" step="0.1" class="form-control" name="slat_distance"
+                               value="{{ profile.slat_distance if profile else '2' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="tilt_mode" class="form-label">Tilt Mode</label>
+                        <select class="form-select" name="tilt_mode">
+                            <option value="mode1" {% if profile and profile.tilt_mode == 'mode1' %}selected{% endif %}>Mode 1</option>
+                            <option value="mode2" {% if profile and profile.tilt_mode == 'mode2' %}selected{% endif %}>Mode 2 (Default)</option>
+                            <option value="mode3" {% if profile and profile.tilt_mode == 'mode3' %}selected{% endif %}>Mode 3</option>
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="inverse_state" id="inverse_state"
+                               {% if profile and profile.inverse_state %}checked{% endif %}>
+                        <label class="form-check-label" for="inverse_state">
+                            Inverse State
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Position Limits -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Position Limits</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="default_position" class="form-label">Default Position (%)</label>
+                        <input type="number" min="0" max="100" class="form-control" id="default_position" name="default_position"
+                               value="{{ profile.default_position if profile else '60' }}" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="min_position" class="form-label">Minimum Position (%)</label>
+                            <input type="number" min="0" max="99" class="form-control" id="min_position" name="min_position"
+                                   value="{{ profile.min_position if profile else '0' }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="max_position" class="form-label">Maximum Position (%)</label>
+                            <input type="number" min="1" max="100" class="form-control" id="max_position" name="max_position"
+                                   value="{{ profile.max_position if profile else '100' }}" required>
+                        </div>
+                    </div>
+
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="enable_min_position" id="enable_min_position"
+                               {% if profile and profile.enable_min_position %}checked{% endif %}>
+                        <label class="form-check-label" for="enable_min_position">
+                            Enable min position only during sun tracking
+                        </label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="enable_max_position" id="enable_max_position"
+                               {% if profile and profile.enable_max_position %}checked{% endif %}>
+                        <label class="form-check-label" for="enable_max_position">
+                            Enable max position only during sun tracking
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sun Timing -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Sun Timing</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="sunset_position" class="form-label">Sunset Position (%)</label>
+                            <input type="number" min="0" max="100" class="form-control" id="sunset_position" name="sunset_position"
+                                   value="{{ profile.sunset_position if profile else '0' }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="sunset_offset" class="form-label">Sunset Offset (min)</label>
+                            <input type="number" class="form-control" id="sunset_offset" name="sunset_offset"
+                                   value="{{ profile.sunset_offset if profile else '0' }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="sunrise_offset" class="form-label">Sunrise Offset (min)</label>
+                            <input type="number" class="form-control" id="sunrise_offset" name="sunrise_offset"
+                                   value="{{ profile.sunrise_offset if profile else '0' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Elevation Limits -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Elevation Limits</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="min_elevation" class="form-label">Minimum Elevation (°)</label>
+                            <input type="number" step="0.1" class="form-control" id="min_elevation" name="min_elevation"
+                                   value="{{ profile.min_elevation if profile else '0' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="max_elevation" class="form-label">Maximum Elevation (°)</label>
+                            <input type="number" step="0.1" class="form-control" id="max_elevation" name="max_elevation"
+                                   value="{{ profile.max_elevation if profile else '90' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Climate Mode -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Advanced Options</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="climate_mode" id="climate_mode"
+                               {% if profile and profile.climate_mode %}checked{% endif %}>
+                        <label class="form-check-label" for="climate_mode">
+                            Enable Climate Mode (requires additional setup)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">Save Profile</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Show/hide cover-specific parameters based on cover type
+    function updateCoverParams() {
+        const coverType = document.getElementById('cover_type').value;
+        document.getElementById('vertical_params').style.display = coverType === 'cover_blind' ? 'block' : 'none';
+        document.getElementById('awning_params').style.display = coverType === 'cover_awning' ? 'block' : 'none';
+        document.getElementById('tilt_params').style.display = coverType === 'cover_tilt' ? 'block' : 'none';
+    }
+
+    document.getElementById('cover_type').addEventListener('change', updateCoverParams);
+    document.addEventListener('DOMContentLoaded', updateCoverParams);
+</script>
+{% endblock %}

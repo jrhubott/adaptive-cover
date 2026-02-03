@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Simulation Results - Adaptive Cover Pro{% endblock %}
+
+{% block extra_head %}
+<!-- Plotly.js CDN -->
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Simulation Results</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                <li class="breadcrumb-item active">Results #{{ sim_id }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- Summary Card -->
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Simulation Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Profile:</strong><br>
+                        {{ profile.name }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Cover Type:</strong><br>
+                        {% if profile.cover_type == 'cover_blind' %}
+                            <span class="badge bg-info">Vertical Blind</span>
+                        {% elif profile.cover_type == 'cover_awning' %}
+                            <span class="badge bg-warning">Horizontal Awning</span>
+                        {% elif profile.cover_type == 'cover_tilt' %}
+                            <span class="badge bg-success">Tilt/Venetian</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Date:</strong><br>
+                        {{ date }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Data Points:</strong><br>
+                        {{ num_points }} ({{ interval }} min interval)
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <strong>Location:</strong> {{ profile.latitude }}°, {{ profile.longitude }}° ({{ profile.timezone }})<br>
+                        <strong>Window Azimuth:</strong> {{ profile.window_azimuth }}° | <strong>FOV:</strong> {{ profile.fov_left }}° left, {{ profile.fov_right }}° right
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('export', sim_id=sim_id, format='csv') }}" class="btn btn-success" download>
+                <i class="bi bi-download"></i> Export CSV
+            </a>
+            <a href="{{ url_for('export', sim_id=sim_id, format='json') }}" class="btn btn-info" download>
+                <i class="bi bi-download"></i> Export JSON
+            </a>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#simulateModal">
+                Run Another Simulation
+            </button>
+            <a href="{{ url_for('configure', profile_id=profile_id) }}" class="btn btn-secondary">
+                Edit Profile
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Combined Chart -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Combined View</h5>
+            </div>
+            <div class="card-body">
+                {{ combined_chart|safe }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Position Chart -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Cover Position Over Time</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Orange markers indicate sun in window FOV, gray markers indicate sun outside FOV.</p>
+                {{ position_chart|safe }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Solar Position Charts -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Solar Position</h5>
+            </div>
+            <div class="card-body">
+                {{ solar_chart|safe }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sun Path Diagram -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Sun Path Diagram</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Polar chart showing sun movement. Green line indicates window center direction,
+                    blue dashed lines show field of view boundaries.
+                </p>
+                {{ sun_path_chart|safe }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Simulate Modal -->
+<div class="modal fade" id="simulateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Run Another Simulation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('simulate') }}" method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="profile_id" value="{{ profile_id }}">
+
+                    <div class="mb-3">
+                        <label for="date" class="form-label">Date</label>
+                        <input type="date" class="form-control" id="date" name="date" value="{{ date }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="interval" class="form-label">Interval (minutes)</label>
+                        <select class="form-select" id="interval" name="interval">
+                            <option value="1">1 minute</option>
+                            <option value="5" {% if interval == 5 %}selected{% endif %}>5 minutes</option>
+                            <option value="10" {% if interval == 10 %}selected{% endif %}>10 minutes</option>
+                            <option value="15" {% if interval == 15 %}selected{% endif %}>15 minutes</option>
+                            <option value="30" {% if interval == 30 %}selected{% endif %}>30 minutes</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Run Simulation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Back to Top Button -->
+<div class="row mt-4">
+    <div class="col-md-12 text-center">
+        <a href="#" class="btn btn-outline-secondary">Back to Top</a>
+    </div>
+</div>
+{% endblock %}

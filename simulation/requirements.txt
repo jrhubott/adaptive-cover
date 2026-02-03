@@ -1,0 +1,4 @@
+Flask==3.0.2
+plotly==5.19.0
+astral==2.2
+pandas==2.2.1

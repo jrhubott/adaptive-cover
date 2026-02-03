@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Adaptive Cover Pro Simulation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Adaptive Cover Pro Simulation</h1>
+        <p class="lead">Test and visualize cover calculations with interactive charts.</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Quick Start</h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li>Create a new profile or edit an existing one</li>
+                    <li>Configure cover type, location, and parameters</li>
+                    <li>Run a simulation for a specific date</li>
+                    <li>Explore interactive charts and export results</li>
+                </ol>
+                <a href="{{ url_for('configure') }}" class="btn btn-primary">Create New Profile</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h2>Saved Profiles</h2>
+
+        {% if profiles %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Location</th>
+                            <th>Window Azimuth</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for profile_id, profile in profiles.items() %}
+                        <tr>
+                            <td><strong>{{ profile.name }}</strong></td>
+                            <td>
+                                {% if profile.cover_type == 'cover_blind' %}
+                                    <span class="badge bg-info">Vertical Blind</span>
+                                {% elif profile.cover_type == 'cover_awning' %}
+                                    <span class="badge bg-warning">Horizontal Awning</span>
+                                {% elif profile.cover_type == 'cover_tilt' %}
+                                    <span class="badge bg-success">Tilt/Venetian</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ profile.latitude }}°, {{ profile.longitude }}°</td>
+                            <td>{{ profile.window_azimuth }}°</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#simulateModal{{ loop.index }}">
+                                    Simulate
+                                </button>
+                                <a href="{{ url_for('configure', profile_id=profile_id) }}" class="btn btn-sm btn-secondary">Edit</a>
+                                <form action="{{ url_for('delete_profile', profile_id=profile_id) }}" method="post" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this profile?');">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+
+                        <!-- Simulate Modal -->
+                        <div class="modal fade" id="simulateModal{{ loop.index }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Simulate: {{ profile.name }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form action="{{ url_for('simulate') }}" method="post">
+                                        <div class="modal-body">
+                                            <input type="hidden" name="profile_id" value="{{ profile_id }}">
+
+                                            <div class="mb-3">
+                                                <label for="date{{ loop.index }}" class="form-label">Date</label>
+                                                <input type="date" class="form-control" id="date{{ loop.index }}" name="date" value="{{ today }}" required>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="interval{{ loop.index }}" class="form-label">Interval (minutes)</label>
+                                                <select class="form-select" id="interval{{ loop.index }}" name="interval">
+                                                    <option value="1">1 minute</option>
+                                                    <option value="5" selected>5 minutes</option>
+                                                    <option value="10">10 minutes</option>
+                                                    <option value="15">15 minutes</option>
+                                                    <option value="30">30 minutes</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-primary">Run Simulation</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <strong>No profiles yet!</strong> Create your first profile to get started.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">About</h5>
+            </div>
+            <div class="card-body">
+                <p>This simulation tool uses the exact same calculation algorithms as the Home Assistant integration.</p>
+                <p>Features:</p>
+                <ul>
+                    <li>Test all three cover types: vertical blinds, horizontal awnings, and tilt/venetian blinds</li>
+                    <li>Visualize cover position changes throughout the day</li>
+                    <li>View solar position data (azimuth and elevation)</li>
+                    <li>Interactive sun path diagrams</li>
+                    <li>Export results as CSV or JSON for further analysis</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Set today's date in all date inputs
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.querySelectorAll('input[type="date"]').forEach(input => {
+            if (!input.value) {
+                input.value = today;
+            }
+        });
+    });
+</script>
+{% endblock %}
