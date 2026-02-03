@@ -163,6 +163,20 @@ Weather entities in Home Assistant may not always reflect real-time conditions a
 - The integration supports both `Lux Entity` and `Irradiance Entity` for direct sunlight measurement
 - If using weather entities, verify they update frequently enough for your needs (every 5-15 minutes is ideal)
 
+### Sensor Startup Reliability
+The integration gracefully handles sensors that are unavailable during Home Assistant startup (common with Zigbee2MQTT, Z-Wave, and other hub-based devices):
+
+- **Automatic recovery**: If temperature, lux, or irradiance sensors report `unavailable` or `None` during startup, the integration uses safe defaults and continues operating
+- **Typical startup time**: Zigbee2MQTT devices often take 20-60 seconds to initialize after Home Assistant starts
+- **No manual intervention required**: Once sensors become available, the integration automatically uses their values
+
+**What happens during startup:**
+- Missing lux/irradiance sensors → Defaults to "light available" (continues with weather-based operation)
+- Missing temperature sensors → Defaults to "comfortable" range (uses basic glare calculations)
+- Missing weather sensors → Uses sun position calculations only
+
+This ensures your covers operate correctly even during brief sensor outages or Home Assistant restarts.
+
 ### Open/Close-Only Covers
 
 Covers that only support OPEN and CLOSE commands (no position control) are supported with threshold-based control:
@@ -372,20 +386,31 @@ This mode is split up in two types of strategies; [Presence](https://github.com/
 
 #### Climate strategies
 
+Climate mode uses a **priority-based decision system** to balance comfort, energy efficiency, and glare reduction:
+
 - **No Presence**:
   Providing daylight to the room is no objective if there is no presence.
 
-  - **Below minimal comfort temperature**:
+  - **Below minimal comfort temperature (Winter Mode)**:
     If the sun is above the horizon and the indoor temperature is below the minimal comfort temperature it opens the blind fully or tilt the slats to be parallel with the sun rays to allow for maximum solar radiation to heat up the room.
 
-  - **Above maximum comfort temperature**:
+  - **Above maximum comfort temperature (Summer Mode)**:
     The objective is to not heat up the room any further by blocking out all possible radiation. All blinds close fully to block out light. <br> <br>
     If the indoor temperature is between both thresholds the position defaults to the set default value based on the time of day.
 
 - **Presence** (or no Presence Entity set):
-  The objective is to reduce glare while providing daylight to the room. All calculation is done by the basic model for Horizontal and Vertical blinds. <br> <br>
-  If you added a weather entity, it will only use the above calculations if the weather state corresponds with the existence of direct sun rays. These states are `sunny`,`windy`, `partlycloudy`, and `cloudy` by default, but you can change the list of states in the weather options. If not equal to these states the position will default to the default value to allow more sunlight entering the room with minimizing the glare due to the weather condition. <br><br>
-  Tilted blinds will only deviate from the above approach if the inside temperature is above the maximum comfort temperature. In that case, the slats will be positioned at 45 degrees as this is [found optimal](https://www.mdpi.com/1996-1073/13/7/1731).
+  The objective is to reduce glare while providing daylight to the room. The system uses the following priority order:
+
+  1. **Winter Mode (Priority 1)**: When indoor temperature is below the minimal comfort threshold and the sun is in front of the window, blinds open to 100% for solar heating. This takes priority over all other conditions including light sensors and weather state.
+
+  2. **Low Light Conditions (Priority 2)**: When it's not summer and light levels are low (lux/irradiance below threshold) or weather is not sunny, the position defaults to the configured default value to allow more sunlight while minimizing glare.
+
+  3. **Summer Mode (Priority 3)**: When indoor temperature is above the maximum comfort threshold with transparent blinds, blinds close to 0% to block heat.
+
+  4. **Normal Glare Calculation (Priority 4)**: In all other conditions (comfortable temperature on sunny days), uses the basic sun-tracking calculation to reduce glare while providing daylight.
+
+  **Weather Integration**: If you configure a weather entity, the system checks if the current weather state indicates direct sunlight (default states: `sunny`, `windy`, `partlycloudy`, `cloudy` - customizable in weather options). However, winter mode (Priority 1) activates regardless of weather or light conditions when temperature thresholds are met. <br><br>
+  **Tilted Blinds**: Follow the same priority system, but in summer mode (when inside temperature exceeds maximum comfort), slats are positioned at 45 degrees as this is [found optimal](https://www.mdpi.com/1996-1073/13/7/1731) for heat blocking while maintaining some light.
 
 ## Variables
 
