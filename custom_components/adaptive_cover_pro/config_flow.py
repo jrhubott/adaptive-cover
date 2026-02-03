@@ -437,7 +437,11 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_horizontal()
             if self.config[CONF_MODE] == SensorType.TILT:
                 return await self.async_step_tilt()
-        return self.async_show_form(step_id="user", data_schema=CONFIG_SCHEMA)
+        return self.async_show_form(
+            step_id="user",
+            data_schema=CONFIG_SCHEMA,
+            description_placeholders={"legacy_count": "0"},
+        )
 
     async def async_step_vertical(self, user_input: dict[str, Any] | None = None):
         """Show basic config for vertical blinds."""
