@@ -425,7 +425,7 @@ check_tag_exists() {
 
     # Check remote tags
     if ! is_dry_run; then
-        if git ls-remote --tags origin | grep -q "refs/tags/$tag"; then
+        if git ls-remote --tags origin | grep -q "refs/tags/$tag$"; then
             log_error "Tag already exists on remote: $tag"
             return 1
         fi
