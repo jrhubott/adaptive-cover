@@ -198,7 +198,6 @@ def generate_sun_path_chart(results: list[dict], profile: dict) -> str:
                 "tickvals": [0, 30, 60, 90],
             },
             "angularaxis": {
-                "title": "Azimuth",
                 "direction": "clockwise",
                 "rotation": 90,
             },
