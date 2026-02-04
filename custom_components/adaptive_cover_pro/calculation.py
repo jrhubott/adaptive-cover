@@ -75,7 +75,7 @@ class AdaptiveGeneralCover(ABC):
     @property
     def _get_azimuth_edges(self) -> tuple[int, int]:
         """Calculate azimuth edges."""
-        return self.fov_left + self.fov_right
+        return (self.azi_min_abs, self.azi_max_abs)
 
     @property
     def is_sun_in_blind_spot(self) -> bool:
@@ -360,6 +360,9 @@ class ClimateCoverData:
             matches = weather_state in self.weather_condition
             self.logger.debug("is_sunny(): Weather: %s = %s", weather_state, matches)
             return matches
+        # No weather condition defined, default to sunny
+        self.logger.debug("is_sunny(): No weather condition defined")
+        return True
 
     @property
     def lux(self) -> bool:
@@ -459,7 +462,7 @@ class ClimateCoverState(NormalCoverState):
                 self.cover.logger.debug(
                     "tilt_w_p(): Summer mode = 45 degrees"
                 )
-                return 45 / degrees * 100
+                return round((45 / degrees) * 100)
 
             # Winter: Use calculated position for optimal light/heat
             if self.climate_data.is_winter:
@@ -483,7 +486,7 @@ class ClimateCoverState(NormalCoverState):
         self.cover.logger.debug(
             "tilt_w_p(): Default = 80 degrees"
         )
-        return 80 / degrees * 100
+        return round((80 / degrees) * 100)
 
     def tilt_without_presence(self, degrees: int) -> int:
         """Determine state for tilted blinds without occupants."""
@@ -494,8 +497,8 @@ class ClimateCoverState(NormalCoverState):
                 return 0
             if self.climate_data.is_winter and self.cover.mode == "mode2":
                 # parallel to sun beams, not possible with single direction
-                return (beta + 90) / degrees * 100
-            return 80 / degrees * 100
+                return round((beta + 90) / degrees * 100)
+            return round((80 / degrees) * 100)
         return super().get_state()
 
     def tilt_state(self):
