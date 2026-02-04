@@ -37,7 +37,7 @@ def mock_sun_data():
 
 @pytest.fixture
 def sample_vertical_config():
-    """Standard vertical cover configuration for testing."""
+    """Return standard vertical cover configuration for testing."""
     return {
         "sol_azi": 180.0,
         "sol_elev": 45.0,
@@ -59,7 +59,7 @@ def sample_vertical_config():
 
 @pytest.fixture
 def sample_horizontal_config():
-    """Standard horizontal cover configuration for testing."""
+    """Return standard horizontal cover configuration for testing."""
     return {
         "sol_azi": 180.0,
         "sol_elev": 45.0,
@@ -81,7 +81,7 @@ def sample_horizontal_config():
 
 @pytest.fixture
 def sample_tilt_config():
-    """Standard tilt cover configuration for testing."""
+    """Return standard tilt cover configuration for testing."""
     return {
         "sol_azi": 180.0,
         "sol_elev": 45.0,
@@ -105,7 +105,7 @@ def sample_tilt_config():
 
 @pytest.fixture
 def sample_climate_config():
-    """Standard climate mode configuration for testing."""
+    """Return standard climate mode configuration for testing."""
     return {
         "temp_entity": "sensor.outside_temperature",
         "temp_low": 20.0,

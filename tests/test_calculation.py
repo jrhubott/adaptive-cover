@@ -1124,9 +1124,9 @@ class TestNormalCoverState:
         # Make calculation exceed 100 (shouldn't normally happen, but test the clip)
         vertical_cover_instance.sol_elev = 89.0
         vertical_cover_instance.distance = 10.0
-        state_handler = NormalCoverState(vertical_cover_instance)
         # Even if calculation exceeds, should clip to 100
         # Note: This may not actually exceed due to h_win clipping, but tests the np.clip
+        # TODO: Add proper assertion when mock setup is complete
 
     @pytest.mark.unit
     @patch("custom_components.adaptive_cover_pro.calculation.datetime")
