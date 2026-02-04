@@ -3032,3 +3032,67 @@ class TestClimateCoverState:
                 default_80_degrees = 80 / 90 * 100  # ~88.9%
                 assert result != pytest.approx(default_80_degrees, abs=1)
                 assert result == 50  # The mocked calculated value
+
+
+@pytest.mark.unit
+def test_tilt_data_cm_to_meter_conversion():
+    """Test that coordinator.tilt_data converts centimeters to meters.
+
+    This is a critical test for Issue #5 - ensures the UI input in cm
+    is correctly converted to meters for calculation formulas.
+    """
+    from custom_components.adaptive_cover_pro.coordinator import AdaptiveDataUpdateCoordinator
+
+    # Create a mock coordinator instance to test the method
+    coordinator = MagicMock(spec=AdaptiveDataUpdateCoordinator)
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.data = {"name": "Test Tilt"}
+
+    # Use the actual tilt_data method
+    options = {
+        "slat_distance": 2.0,   # 2.0 cm (user input)
+        "slat_depth": 2.5,      # 2.5 cm (user input)
+        "tilt_mode": "mode2",
+    }
+
+    # Call the actual method (not the mock)
+    result = AdaptiveDataUpdateCoordinator.tilt_data(coordinator, options)
+
+    # Should convert cm to meters
+    assert result[0] == pytest.approx(0.02, abs=0.0001)    # 2.0 cm -> 0.02 m (distance)
+    assert result[1] == pytest.approx(0.025, abs=0.0001)   # 2.5 cm -> 0.025 m (depth)
+    assert result[2] == "mode2"
+
+
+@pytest.mark.unit
+def test_tilt_data_warns_on_small_values(caplog):
+    """Test that coordinator.tilt_data warns when values are suspiciously small.
+
+    Values < 0.1 likely indicate user entered meters (following old instructions)
+    instead of centimeters.
+    """
+    import logging
+    from custom_components.adaptive_cover_pro.coordinator import AdaptiveDataUpdateCoordinator
+
+    # Create a mock coordinator instance to test the method
+    coordinator = MagicMock(spec=AdaptiveDataUpdateCoordinator)
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.data = {"name": "Test Tilt Small"}
+
+    # Use very small values (likely meters entered by mistake)
+    options = {
+        "slat_distance": 0.02,   # 0.02 cm (suspiciously small - likely meant 0.02m)
+        "slat_depth": 0.025,     # 0.025 cm (suspiciously small - likely meant 0.025m)
+        "tilt_mode": "mode2",
+    }
+
+    with caplog.at_level(logging.WARNING):
+        result = AdaptiveDataUpdateCoordinator.tilt_data(coordinator, options)
+
+    # Should still convert (0.02 cm -> 0.0002 m) but log warning
+    assert result[0] == pytest.approx(0.0002, abs=0.00001)
+    assert result[1] == pytest.approx(0.00025, abs=0.00001)
+
+    # Should have logged a warning
+    assert any("slat dimensions are very small" in record.message for record in caplog.records)
+    assert any("CENTIMETERS" in record.message for record in caplog.records)

@@ -464,11 +464,11 @@ The Minimal Position and Maximum Position settings create boundaries for automat
 
 ### Tilt
 
-| Variables     | Default        | Range  | Description                                                |
-| ------------- | -------------- | ------ | ---------------------------------------------------------- |
-| Slat Depth    | 3              | 0.1-15 | Width of each slat                                         |
-| Slat Distance | 2              | 0.1-15 | Vertical distance between two slats in horizontal position |
-| Tilt Mode     | Bi-directional |        |                                                            |
+| Variables     | Default        | Range      | Description                                                |
+| ------------- | -------------- | ---------- | ---------------------------------------------------------- |
+| Slat Depth    | 3 cm           | 0.1-15 cm  | Width of each slat (measure one slat front to back)        |
+| Slat Distance | 2 cm           | 0.1-15 cm  | Vertical distance between slat centers                     |
+| Tilt Mode     | Bi-directional |            | Mode1: 0-90°, Mode2: 0-180° slat rotation                  |
 
 ### Automation
 

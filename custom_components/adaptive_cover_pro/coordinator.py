@@ -232,6 +232,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         Returns:
             Dict of capabilities (has_set_position, has_set_tilt_position, has_open, has_close)
+
         """
         caps = check_cover_features(self.hass, entity)
         if caps is None:
@@ -266,6 +267,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         Returns:
             Current position or None
+
         """
         if self.is_tilt_cover:
             if caps.get("has_set_tilt_position", True):
@@ -393,6 +395,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         Returns:
             Calculated state position
+
         """
         # Access climate data if climate mode is enabled
         if self._climate_mode:
@@ -418,6 +421,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         Returns:
             Tuple of (start_time, end_time)
+
         """
         if (
             self.first_refresh
@@ -597,6 +601,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         Returns:
             Tuple of (service_name, service_data, supports_position)
+
         """
         # Determine if cover supports position control
         supports_position = False
@@ -672,6 +677,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             service: Service name called
             state: Requested position
             supports_position: Whether position control is used
+
         """
         self.last_cover_action = {
             "entity_id": entity,
@@ -964,10 +970,28 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         ]
 
     def tilt_data(self, options):
-        """Update data for tilted blinds."""
+        """Update data for tilted blinds.
+
+        Converts slat dimensions from centimeters (as entered in UI) to meters
+        (as required by calculation formulas).
+        """
+        depth = options.get(CONF_TILT_DEPTH)
+        distance = options.get(CONF_TILT_DISTANCE)
+
+        # Warn if values are suspiciously small (likely already in meters)
+        if depth < 0.1 or distance < 0.1:
+            _LOGGER.warning(
+                "Tilt cover '%s': slat dimensions are very small (depth=%s, distance=%s). "
+                "If you previously entered values in METERS, please reconfigure and enter in CENTIMETERS. "
+                "For example: 2.5cm slats should be entered as '2.5', not '0.025'.",
+                self.config_entry.data.get("name"),
+                depth,
+                distance,
+            )
+
         return [
-            options.get(CONF_TILT_DISTANCE),
-            options.get(CONF_TILT_DEPTH),
+            distance / 100,  # Convert cm to meters
+            depth / 100,     # Convert cm to meters
             options.get(CONF_TILT_MODE),
         ]
 
