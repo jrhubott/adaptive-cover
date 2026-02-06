@@ -538,16 +538,104 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
 
     distance: float
     h_win: float
+    window_depth: float = 0.0  # Window reveal/frame depth (meters), default 0 = disabled
+
+    def _calculate_safety_margin(self, gamma: float, sol_elev: float) -> float:
+        """Calculate angle-dependent safety margin multiplier (≥1.0).
+
+        Increases blind extension at extreme angles to ensure effective sun blocking:
+        - Gamma margin: increases at extreme horizontal angles (>45°)
+        - Elevation margin: increases at very low (<10°) or high (>75°) angles
+
+        Args:
+            gamma: Surface solar azimuth in degrees (-180 to 180)
+            sol_elev: Sun elevation angle in degrees (0-90)
+
+        Returns:
+            Safety margin multiplier (1.0 to 1.45)
+
+        """
+        margin = 1.0
+
+        # Gamma margin: increases at extreme horizontal angles
+        gamma_abs = abs(gamma)
+        if gamma_abs > 45:
+            t = (gamma_abs - 45) / 45  # 0 at 45°, 1 at 90°
+            t = np.clip(t, 0, 1)
+            smooth_t = t * t * (3 - 2 * t)  # Smoothstep interpolation
+            margin += 0.2 * smooth_t  # Up to 20% increase
+
+        # Elevation margin: increases at very low/high angles
+        if sol_elev < 10:
+            t = (10 - sol_elev) / 10
+            margin += 0.15 * np.clip(t, 0, 1)  # Up to 15% increase
+        elif sol_elev > 75:
+            t = (sol_elev - 75) / 15
+            margin += 0.1 * np.clip(t, 0, 1)  # Up to 10% increase
+
+        return margin
+
+    def _handle_edge_cases(self) -> tuple[bool, float]:
+        """Handle extreme angles with safe fallbacks.
+
+        Provides robust behavior at edge cases where standard geometric
+        calculations become unstable or inaccurate.
+
+        Returns:
+            Tuple of (is_edge_case: bool, position: float)
+            - is_edge_case: True if edge case detected
+            - position: Safe fallback position (only valid if is_edge_case=True)
+
+        """
+        # Very low elevation: sun nearly horizontal, full coverage safest
+        if self.sol_elev < 2.0:
+            return (True, self.h_win)
+
+        # Extreme gamma: sun perpendicular to window, full coverage
+        if abs(self.gamma) > 85:
+            return (True, self.h_win)
+
+        # Very high elevation: sun nearly overhead, simplified calculation
+        if self.sol_elev > 88.0:
+            simple_height = self.distance * tan(rad(self.sol_elev))
+            return (True, np.clip(simple_height, 0, self.h_win))
+
+        return (False, 0.0)
 
     def calculate_position(self) -> float:
-        """Calculate blind height."""
-        # calculate blind height
-        blind_height = np.clip(
-            (self.distance / cos(rad(self.gamma))) * tan(rad(self.sol_elev)),
-            0,
-            self.h_win,
-        )
-        return blind_height
+        """Calculate blind height with enhanced geometric accuracy.
+
+        Uses improved geometric model with:
+        - Edge case handling for extreme sun angles
+        - Angle-dependent safety margins for better sun blocking
+        - Optional window depth consideration for advanced accuracy
+        - Smooth transitions across all angles
+
+        Returns:
+            Blind height in meters (0 to h_win)
+
+        """
+        # Check edge cases first
+        is_edge_case, edge_position = self._handle_edge_cases()
+        if is_edge_case:
+            return edge_position
+
+        # Account for window depth at angles (creates additional shadow)
+        effective_distance = self.distance
+        if self.window_depth > 0 and abs(self.gamma) > 10:
+            # At angles, window depth creates additional horizontal offset
+            depth_contribution = self.window_depth * sin(rad(abs(self.gamma)))
+            effective_distance += depth_contribution
+
+        # Base calculation: project glare zone to vertical blind height
+        path_length = effective_distance / cos(rad(self.gamma))
+        base_height = path_length * tan(rad(self.sol_elev))
+
+        # Apply safety margin for extreme angles
+        safety_margin = self._calculate_safety_margin(self.gamma, self.sol_elev)
+        adjusted_height = base_height * safety_margin
+
+        return np.clip(adjusted_height, 0, self.h_win)
 
     def calculate_percentage(self) -> float:
         """Convert blind height to percentage or default value."""
@@ -563,8 +651,8 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
 class AdaptiveHorizontalCover(AdaptiveVerticalCover):
     """Calculate state for Horizontal blinds."""
 
-    awn_length: float
-    awn_angle: float
+    awn_length: float = 2.0  # Default awning length (meters)
+    awn_angle: float = 0.0  # Default awning angle (degrees)
 
     def calculate_position(self) -> float:
         """Calculate awn length from blind height."""

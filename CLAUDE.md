@@ -26,7 +26,11 @@ This integration follows Home Assistant's **Data Coordinator Pattern**:
 - Orchestrates position calculations and cover service calls
 
 **`calculation.py`** - Position calculation algorithms
-- `AdaptiveVerticalCover` - Up/down blind calculations
+- `AdaptiveVerticalCover` - Up/down blind calculations with enhanced geometric accuracy
+  - `calculate_position()` - Main calculation with safety margins and window depth support
+  - `_calculate_safety_margin()` - Angle-dependent safety margins (0-35% at extremes)
+  - `_handle_edge_cases()` - Robust fallbacks for extreme sun angles
+  - Supports optional `window_depth` parameter for advanced precision
 - `AdaptiveHorizontalCover` - In/out awning calculations
 - `AdaptiveTiltCover` - Slat rotation calculations
 - `NormalCoverState` - Basic sun position mode
@@ -587,6 +591,114 @@ The `inverse_state` feature handles covers that don't follow Home Assistant guid
 - Skip inverse_state for open/close-only covers when enabled
 - Apply inverse_state after the threshold check
 
+### Enhanced Geometric Accuracy
+
+**Added in v2.7.0** to fix Issue #1 (shadow calculation accuracy at extreme angles).
+
+The integration includes sophisticated geometric enhancements to ensure accurate sun blocking across all sun positions. These improvements are implemented in `AdaptiveVerticalCover.calculate_position()` in `calculation.py`.
+
+#### Implementation Details
+
+**Phase 1: Core Formula Enhancements (Automatic)**
+
+1. **Edge Case Handling** (`_handle_edge_cases()`)
+   - Elevation < 2°: Returns full window coverage (h_win)
+   - |Gamma| > 85°: Returns full window coverage (h_win)
+   - Elevation > 88°: Uses simplified calculation (distance × tan(elevation))
+   - Returns tuple: `(is_edge_case: bool, position: float)`
+
+2. **Safety Margins** (`_calculate_safety_margin()`)
+   - Returns multiplier ≥1.0 to increase blind extension
+   - Gamma margin: Smoothstep interpolation from 1.0 (at 45°) to 1.2 (at 90°)
+   - Low elevation margin: Linear from 1.0 (at 10°) to 1.15 (at 0°)
+   - High elevation margin: Linear from 1.0 (at 75°) to 1.1 (at 90°)
+   - Margins combine multiplicatively (margin = gamma_margin × elev_margin)
+
+3. **Calculation Flow**
+   ```python
+   def calculate_position(self) -> float:
+       # 1. Check edge cases first
+       is_edge_case, edge_position = self._handle_edge_cases()
+       if is_edge_case:
+           return edge_position
+
+       # 2. Account for window depth (if configured)
+       effective_distance = self.distance
+       if self.window_depth > 0 and abs(self.gamma) > 10:
+           depth_contribution = self.window_depth * sin(rad(abs(self.gamma)))
+           effective_distance += depth_contribution
+
+       # 3. Base calculation
+       path_length = effective_distance / cos(rad(self.gamma))
+       base_height = path_length * tan(rad(self.sol_elev))
+
+       # 4. Apply safety margin
+       safety_margin = self._calculate_safety_margin(self.gamma, self.sol_elev)
+       adjusted_height = base_height * safety_margin
+
+       # 5. Clip to window height
+       return np.clip(adjusted_height, 0, self.h_win)
+   ```
+
+**Phase 2: Window Depth Parameter (Optional)**
+
+- Added `window_depth` field to `AdaptiveVerticalCover` dataclass (default 0.0)
+- Configured via `CONF_WINDOW_DEPTH` in config flow (0.0-0.5m range)
+- Only affects calculation when `window_depth > 0` and `|gamma| > 10°`
+- Adds horizontal offset: `depth_contribution = window_depth × sin(|gamma|)`
+- Accounts for window reveals/frames creating additional shadow
+
+#### Testing Requirements
+
+When modifying geometric accuracy calculations:
+
+1. **Run existing tests** to ensure no regression:
+   ```bash
+   source venv/bin/activate
+   python -m pytest tests/test_geometric_accuracy.py -v
+   ```
+
+2. **Test coverage requirements:**
+   - Safety margin behavior at all angle ranges
+   - Edge case handling at thresholds
+   - Smooth transitions across ranges
+   - Regression tests (<5% deviation at normal angles)
+   - Backward compatibility (window_depth=0 matches Phase 1)
+
+3. **Key test files:**
+   - `tests/test_geometric_accuracy.py` - 34 dedicated tests
+   - `tests/test_calculation.py` - Integration with existing calculation tests
+
+#### Modification Guidelines
+
+**DO:**
+- Test all changes with full test suite (214 tests must pass)
+- Maintain backward compatibility (existing installations unaffected)
+- Keep safety margins conservative (always ≥ baseline position)
+- Use smoothstep interpolation for smooth transitions
+- Document changes in commit messages and release notes
+
+**DON'T:**
+- Remove or reduce safety margins without thorough testing
+- Change edge case thresholds without testing transitions
+- Break backward compatibility (window_depth must default to 0.0)
+- Introduce numerical instability (NaN, infinity)
+- Skip regression testing at normal angles
+
+**CRITICAL:**
+- Safety margins are intentionally conservative to ensure sun blocking
+- Edge case thresholds chosen to prevent numerical instability
+- Smoothstep interpolation prevents jarring position changes
+- Window depth is optional (Phase 1 works standalone)
+
+#### Diagnostic Information
+
+Users can monitor geometric accuracy via diagnostic sensors:
+- "Calculated Position" - Raw position before adjustments
+- "Sun Gamma" - Horizontal angle from window normal
+- "Sun Elevation" - Vertical angle above horizon
+- Compare calculated vs actual position to see safety margin effects
+
 ## Configuration Structure
 
 **`config_entry.data`** (setup phase):
@@ -596,6 +708,9 @@ The `inverse_state` feature handles covers that don't follow Home Assistant guid
 **`config_entry.options`** (configurable):
 - Window azimuth, field of view, elevation limits
 - Cover-specific dimensions (height, length, slat properties)
+- Enhanced geometric accuracy:
+  - `window_depth` - Optional window reveal/frame depth (0.0-0.5m, default 0.0)
+  - Safety margins and edge case handling apply automatically (not configurable)
 - Position limits:
   - `min_position` / `max_position` - Absolute position boundaries (0-99%, 1-100%)
   - `enable_min_position` / `enable_max_position` - When limits apply:

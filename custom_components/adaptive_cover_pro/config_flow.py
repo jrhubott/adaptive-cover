@@ -26,6 +26,7 @@ from .const import (
     CONF_DELTA_POSITION,
     CONF_DELTA_TIME,
     CONF_DISTANCE,
+    CONF_WINDOW_DEPTH,
     CONF_ENABLE_BLIND_SPOT,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_END_ENTITY,
@@ -185,6 +186,15 @@ VERTICAL_OPTIONS = vol.Schema(
         vol.Required(CONF_DISTANCE, default=0.5): selector.NumberSelector(
             selector.NumberSelectorConfig(
                 min=0.1, max=5, step=0.1, mode="slider", unit_of_measurement="m"
+            )
+        ),
+        vol.Optional(CONF_WINDOW_DEPTH, default=0.0): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0.0,
+                max=0.5,
+                step=0.01,
+                unit_of_measurement="m",
+                mode=selector.NumberSelectorMode.BOX,
             )
         ),
     }
