@@ -7,7 +7,7 @@ import asyncio
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -87,6 +87,7 @@ class AdaptiveCoverButton(
                 )
                 while self.coordinator.wait_for_target.get(entity):
                     await asyncio.sleep(1)
+                self.coordinator._cancel_grace_period(entity)
                 self.coordinator.manager.reset(entity)
             else:
                 _LOGGER.debug(

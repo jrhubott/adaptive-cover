@@ -115,6 +115,7 @@ from .const import (
     MAX_POSITION_RETRIES,
     POSITION_CHECK_INTERVAL_MINUTES,
     POSITION_TOLERANCE_PERCENT,
+    COMMAND_GRACE_PERIOD_SECONDS,
 )
 from .helpers import (
     get_datetime_from_str,
@@ -198,6 +199,10 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.ignore_intermediate_states = self.config_entry.options.get(
             CONF_MANUAL_IGNORE_INTERMEDIATE, False
         )
+        # Command grace period tracking
+        self._command_grace_period_seconds = COMMAND_GRACE_PERIOD_SECONDS
+        self._command_timestamps: dict[str, float] = {}
+        self._grace_period_tasks: dict[str, asyncio.Task] = {}
         self._update_listener = None
         self._scheduled_time = dt.datetime.now()
 
@@ -348,7 +353,14 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.logger.debug("Ignoring intermediate state change for %s", entity_id)
             return
         if self.wait_for_target.get(entity_id):
-            # Check capabilities on-demand
+            # Check if still in grace period
+            if self._is_in_grace_period(entity_id):
+                self.logger.debug(
+                    "Position change for %s ignored (in grace period)", entity_id
+                )
+                return  # Ignore ALL position changes during grace period
+
+            # Grace period expired, check if we reached target
             caps = self._get_cover_capabilities(entity_id)
 
             # Get position based on capability
@@ -362,6 +374,78 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.logger.debug("Wait for target: %s", self.wait_for_target)
         else:
             self.logger.debug("No wait for target call for %s", entity_id)
+
+    def _is_in_grace_period(self, entity_id: str) -> bool:
+        """Check if entity is in command grace period.
+
+        Args:
+            entity_id: Entity to check
+
+        Returns:
+            True if in grace period, False otherwise
+
+        """
+        timestamp = self._command_timestamps.get(entity_id)
+        if timestamp is None:
+            return False
+
+        elapsed = dt.datetime.now().timestamp() - timestamp
+        return elapsed < self._command_grace_period_seconds
+
+    def _start_grace_period(self, entity_id: str) -> None:
+        """Start grace period for entity.
+
+        Sets timestamp and schedules automatic clearing after grace period.
+
+        Args:
+            entity_id: Entity to start grace period for
+
+        """
+        # Cancel any existing grace period task
+        self._cancel_grace_period(entity_id)
+
+        # Record command timestamp
+        now = dt.datetime.now().timestamp()
+        self._command_timestamps[entity_id] = now
+
+        # Schedule automatic grace period expiration
+        task = asyncio.create_task(self._grace_period_timeout(entity_id))
+        self._grace_period_tasks[entity_id] = task
+
+        self.logger.debug(
+            "Started %s second grace period for %s",
+            self._command_grace_period_seconds,
+            entity_id,
+        )
+
+    async def _grace_period_timeout(self, entity_id: str) -> None:
+        """Clear grace period after timeout.
+
+        Args:
+            entity_id: Entity whose grace period expired
+
+        """
+        await asyncio.sleep(self._command_grace_period_seconds)
+
+        # Clear tracking
+        self._command_timestamps.pop(entity_id, None)
+        self._grace_period_tasks.pop(entity_id, None)
+
+        self.logger.debug("Grace period expired for %s", entity_id)
+
+    def _cancel_grace_period(self, entity_id: str) -> None:
+        """Cancel grace period task for entity.
+
+        Args:
+            entity_id: Entity whose grace period to cancel
+
+        """
+        task = self._grace_period_tasks.get(entity_id)
+        if task and not task.done():
+            task.cancel()
+
+        self._grace_period_tasks.pop(entity_id, None)
+        self._command_timestamps.pop(entity_id, None)
 
     @callback
     def _async_cancel_update_listener(self) -> None:
@@ -630,6 +714,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
             self.wait_for_target[entity] = True
             self.target_call[entity] = state
+            self._start_grace_period(entity)
             self.logger.debug(
                 "Set wait for target %s and target call %s",
                 self.wait_for_target,
@@ -657,6 +742,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
             service_data = {ATTR_ENTITY_ID: entity}
             self.wait_for_target[entity] = True
+            self._start_grace_period(entity)
 
             self.logger.debug(
                 "Using open/close control: state=%s, threshold=%s, service=%s",
@@ -1323,6 +1409,17 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self._position_check_interval()
             self._position_check_interval = None
             self.logger.debug("Stopped periodic position verification")
+
+    async def async_shutdown(self) -> None:
+        """Clean up resources on shutdown."""
+        # Cancel all grace period tasks
+        for entity_id in list(self._grace_period_tasks.keys()):
+            self._cancel_grace_period(entity_id)
+
+        # Stop position verification
+        self._stop_position_verification()
+
+        self.logger.debug("Coordinator shutdown complete")
 
 
 class AdaptiveCoverManager:
