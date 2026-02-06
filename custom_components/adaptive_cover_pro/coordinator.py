@@ -61,6 +61,7 @@ from .const import (
     CONF_DELTA_POSITION,
     CONF_DELTA_TIME,
     CONF_DISTANCE,
+    CONF_WINDOW_DEPTH,
     CONF_ENABLE_BLIND_SPOT,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_MAX_POSITION,
@@ -192,6 +193,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.climate_data = None  # Store climate_data for P1 diagnostics
         self.control_method = "intermediate"
         self.state_change_data: StateChangedData | None = None
+        self.raw_calculated_position = 0  # Store raw position for diagnostics
         self.manager = AdaptiveCoverManager(self.hass, self.manual_duration, self.logger)
         self.wait_for_target = {}
         self.target_call = {}
@@ -223,6 +225,15 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._check_interval_minutes = POSITION_CHECK_INTERVAL_MINUTES
         self._position_tolerance = POSITION_TOLERANCE_PERCENT
         self._max_retries = MAX_POSITION_RETRIES
+
+        # Track entities that have never received commands (for cleaner logging)
+        self._never_commanded: set[str] = set()
+
+        # Track time window state transitions (for responsive end time handling)
+        self._last_time_window_state: bool | None = None
+
+        # Track sun validity transitions (for responsive sun in-front detection)
+        self._last_sun_validity_state: bool | None = None
 
     def _get_cover_capabilities(self, entity: str) -> dict[str, bool]:
         """Get cover capabilities with fallback to safe defaults.
@@ -302,7 +313,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.logger.debug("Checking timed refresh. End time: %s, now: %s", time, now)
 
         time_check = now - get_datetime_from_str(time)
-        if time is not None and (time_check <= dt.timedelta(seconds=1)):
+        if time is not None and (time_check <= dt.timedelta(seconds=5)):
             self.timed_refresh = True
             self.logger.debug("Timed refresh triggered")
             await self.async_refresh()
@@ -411,6 +422,17 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         self.default_state = round(self.normal_cover_state.get_state())
         self.logger.debug("Determined default state to be %s", self.default_state)
+
+        # Store raw calculated position for diagnostics (before min/max limits)
+        # This is the pure geometric calculation
+        if cover_data.direct_sun_valid:
+            # Sun is in front - use raw calculated percentage
+            self.raw_calculated_position = round(cover_data.calculate_percentage())
+        else:
+            # Sun not in front - use default position (no calculation)
+            self.raw_calculated_position = cover_data.default
+        self.logger.debug("Raw calculated position: %s", self.raw_calculated_position)
+
         return self.state
 
     async def _update_solar_times_if_needed(self, normal_cover) -> tuple[dt.datetime, dt.datetime]:
@@ -543,12 +565,19 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         """Handle first refresh."""
         if self.automatic_control:
             for cover in self.entities:
-                if (
-                    self.check_adaptive_time
-                    and not self.manager.is_cover_manual(cover)
-                    and self.check_position_delta(cover, state, options)
-                ):
-                    await self.async_set_position(cover, state)
+                # Always set target position for verification, even if we don't send command
+                # This ensures position verification works after restart
+                if self.check_adaptive_time and not self.manager.is_cover_manual(cover):
+                    self.target_call[cover] = state
+                    self.logger.debug(
+                        "First refresh: Set target position %s for %s",
+                        state,
+                        cover
+                    )
+
+                    # Now check if we should actually send the command
+                    if self.check_position_delta(cover, state, options):
+                        await self.async_set_position(cover, state)
         else:
             self.logger.debug("First refresh but control toggle is off")
         self.first_refresh = False
@@ -630,6 +659,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
             self.wait_for_target[entity] = True
             self.target_call[entity] = state
+            self._never_commanded.discard(entity)  # Remove from never-commanded tracking
             self.logger.debug(
                 "Set wait for target %s and target call %s",
                 self.wait_for_target,
@@ -651,9 +681,11 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             if state >= self._open_close_threshold:
                 service = "open_cover"
                 self.target_call[entity] = 100
+                self._never_commanded.discard(entity)  # Remove from never-commanded tracking
             else:
                 service = "close_cover"
                 self.target_call[entity] = 0
+                self._never_commanded.discard(entity)  # Remove from never-commanded tracking
 
             service_data = {ATTR_ENTITY_ID: entity}
             self.wait_for_target[entity] = True
@@ -839,10 +871,30 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         return self._read_position_with_capabilities(entity, caps)
 
     def check_position(self, entity, state):
-        """Check if position is different as state."""
+        """Check if position is different as state.
+
+        Bypasses check if sun just came into field of view to ensure
+        covers reposition even if calculated position equals current position
+        (can happen when min/max limits clamp low-angle calculations).
+        """
         position = self._get_current_position(entity)
         if position is not None:
+            # Check if sun just came into field of view
+            sun_just_appeared = self._check_sun_validity_transition()
+
+            if sun_just_appeared:
+                self.logger.debug(
+                    "Bypassing position equality check: sun just came into field of view "
+                    "(entity: %s, position: %s, state: %s)",
+                    entity,
+                    position,
+                    state
+                )
+                return True  # Force repositioning on sun visibility transition
+
+            # Normal check: only move if position changed
             return position != state
+
         self.logger.debug("Cover is already at position %s", state)
         return False
 
@@ -851,8 +903,18 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         position = self._get_current_position(entity)
         if position is not None:
             condition = abs(position - state) >= self.min_change
+
+            # Get special positions for comparison
+            default_height = options.get(CONF_DEFAULT_HEIGHT)
+            sunset_pos = options.get(CONF_SUNSET_POS)
+            special_positions = [0, 100]
+            if default_height is not None:
+                special_positions.append(default_height)
+            if sunset_pos is not None:
+                special_positions.append(sunset_pos)
+
             self.logger.debug(
-                "Entity: %s,  position: %s, state: %s, delta position: %s, min_change: %s, condition: %s",
+                "Entity: %s, position: %s, state: %s, delta position: %s, min_change: %s, condition: %s",
                 entity,
                 position,
                 state,
@@ -860,13 +922,24 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self.min_change,
                 condition,
             )
-            if state in [
-                options.get(CONF_SUNSET_POS),
-                options.get(CONF_DEFAULT_HEIGHT),
-                0,
-                100,
-            ]:
+
+            # Bypass delta check when moving TO special positions (existing logic)
+            if state in special_positions:
+                self.logger.debug(
+                    "Bypassing delta check: moving TO special position %s", state
+                )
                 condition = True
+
+            # Bypass delta check when moving FROM special positions (NEW logic)
+            # This ensures covers reposition when sun transitions from "not in front" to "in front"
+            elif position in special_positions:
+                self.logger.debug(
+                    "Bypassing delta check: moving FROM special position %s to calculated position %s",
+                    position,
+                    state
+                )
+                condition = True
+
             return condition
         return True
 
@@ -960,6 +1033,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         return [
             options.get(CONF_DISTANCE),
             options.get(CONF_HEIGHT_WIN),
+            options.get(CONF_WINDOW_DEPTH, 0.0),  # Default 0.0 for backward compatibility
         ]
 
     def horizontal_data(self, options):
@@ -1011,7 +1085,10 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     def _build_position_diagnostics(self) -> dict:
         """Build calculated position diagnostics."""
         diagnostics = {}
-        diagnostics["calculated_position"] = self.default_state
+
+        # Use raw calculated position (before min/max limits) for diagnostic
+        diagnostics["calculated_position"] = self.raw_calculated_position
+
         if self.climate_state is not None:
             diagnostics["calculated_position_climate"] = self.climate_state
 
@@ -1141,17 +1218,13 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         """Interpolate states."""
         normal_range = [0, 100]
         new_range = []
-        if self.start_value and self.end_value:
+        if self.start_value is not None and self.end_value is not None:
             new_range = [self.start_value, self.end_value]
         if self.normal_list and self.new_list:
             normal_range = list(map(int, self.normal_list))
             new_range = list(map(int, self.new_list))
         if new_range:
             state = np.interp(state, normal_range, new_range)
-            if state == new_range[0]:
-                state = 0
-            if state == new_range[-1]:
-                state = 100
         return state
 
     @property
@@ -1217,8 +1290,71 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     def return_to_default_toggle(self, value):
         self._return_to_default_toggle = value
 
+    async def _check_time_window_transition(self, now: dt.datetime) -> None:
+        """Check if time window state has changed and trigger refresh if needed.
+
+        This method detects when the operational time window changes state
+        (e.g., when end time is reached) and triggers appropriate actions.
+        Provides <1 minute response time for time window changes.
+        """
+        # Initialize tracking on first call
+        if self._last_time_window_state is None:
+            self._last_time_window_state = self.check_adaptive_time
+            return
+
+        current_state = self.check_adaptive_time
+
+        # If state changed, trigger appropriate action
+        if current_state != self._last_time_window_state:
+            self.logger.info(
+                "Time window state changed: %s → %s",
+                "active" if self._last_time_window_state else "inactive",
+                "active" if current_state else "inactive"
+            )
+            self._last_time_window_state = current_state
+
+            # If we just left the time window, return covers to default position
+            if not current_state and self._track_end_time:
+                self.logger.info("End time reached, returning covers to default position")
+                self.timed_refresh = True
+                await self.async_refresh()
+
+    def _check_sun_validity_transition(self) -> bool:
+        """Check if sun validity state has changed from False to True.
+
+        Returns True if sun just came into field of view, indicating
+        covers should immediately reposition regardless of delta checks.
+        """
+        # Need cover data to check sun validity
+        if not hasattr(self, 'normal_cover_state') or self.normal_cover_state is None:
+            return False
+
+        current_sun_valid = self.normal_cover_state.cover.direct_sun_valid
+
+        # Initialize tracking on first call
+        if self._last_sun_validity_state is None:
+            self._last_sun_validity_state = current_sun_valid
+            return False
+
+        # Detect transition from not-in-front to in-front
+        sun_just_appeared = (not self._last_sun_validity_state) and current_sun_valid
+
+        # Update tracking
+        self._last_sun_validity_state = current_sun_valid
+
+        if sun_just_appeared:
+            self.logger.info(
+                "Sun visibility transition detected: OFF → ON (sun came into field of view)"
+            )
+
+        return sun_just_appeared
+
     async def async_periodic_position_check(self, now: dt.datetime) -> None:
         """Periodically verify cover positions match calculated positions."""
+        # Check if time window state changed (e.g., passed end time)
+        # This provides <1 minute response time for time window changes
+        await self._check_time_window_transition(now)
+
         # Skip if not within operational time window
         if not self.check_adaptive_time:
             return
@@ -1248,8 +1384,13 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         # Get target position (the position we last sent to this cover)
         target_position = self.target_call.get(entity_id)
         if target_position is None:
-            # No command has been sent yet, nothing to verify
-            self.logger.debug("No target position set for %s, skipping verification", entity_id)
+            # Only log once when first encountered to avoid log spam
+            if entity_id not in self._never_commanded:
+                self._never_commanded.add(entity_id)
+                self.logger.debug(
+                    "No command sent to %s yet, position verification will begin after first command",
+                    entity_id
+                )
             return
 
         # Get actual position

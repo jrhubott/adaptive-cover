@@ -12,8 +12,6 @@
   "ruff.path": ["${workspaceFolder}/venv/bin/ruff"],
   "ruff.importStrategy": "fromEnvironment",
   "ruff.lint.enable": true,
-  "ruff.format.args": [],
-  "ruff.lint.args": [],
 
   // Format on Save
   "[python]": {

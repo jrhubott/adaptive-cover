@@ -13,6 +13,7 @@ CONF_AZIMUTH = "set_azimuth"
 CONF_BLUEPRINT = "blueprint"
 CONF_HEIGHT_WIN = "window_height"
 CONF_DISTANCE = "distance_shaded_area"
+CONF_WINDOW_DEPTH = "window_depth"
 CONF_DEFAULT_HEIGHT = "default_percentage"
 CONF_FOV_LEFT = "fov_left"
 CONF_FOV_RIGHT = "fov_right"
@@ -77,7 +78,7 @@ CONF_OPEN_CLOSE_THRESHOLD = "open_close_threshold"
 CONF_ENABLE_DIAGNOSTICS = "enable_diagnostics"
 
 # Position verification constants (fixed values, not configurable)
-POSITION_CHECK_INTERVAL_MINUTES = 2  # Fixed interval for position verification
+POSITION_CHECK_INTERVAL_MINUTES = 1  # Fixed interval for position verification
 POSITION_TOLERANCE_PERCENT = 3  # Fixed tolerance for position matching
 MAX_POSITION_RETRIES = 3  # Maximum retry attempts before giving up
 
