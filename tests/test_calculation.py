@@ -407,7 +407,7 @@ class TestAdaptiveGeneralCoverProperties:
     def test_azi_edges_calculation(self, vertical_cover_instance):
         """Test azimuth edges calculation."""
         edges = vertical_cover_instance._get_azimuth_edges
-        assert edges == 90  # 45 + 45
+        assert edges == (135, 225)  # (win_azi - fov_left, win_azi + fov_right)
 
     @pytest.mark.unit
     def test_gamma_sun_directly_in_front(self, vertical_cover_instance):
