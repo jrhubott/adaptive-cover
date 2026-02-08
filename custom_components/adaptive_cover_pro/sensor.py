@@ -500,6 +500,143 @@ class AdaptiveCoverDiagnosticSensor(
             return None
         return self.data.diagnostics.get(self._diagnostic_key)
 
+    def _build_azimuth_attributes(self) -> dict[str, Any] | None:
+        """Build attributes for sun azimuth sensor."""
+        config = self.data.diagnostics.get("configuration", {})
+        window_azi = config.get("azimuth")
+        fov_left = config.get("fov_left")
+        fov_right = config.get("fov_right")
+
+        if window_azi is None or fov_left is None or fov_right is None:
+            return None
+
+        azi_min = (window_azi - fov_left + 360) % 360
+        azi_max = (window_azi + fov_right + 360) % 360
+
+        return {
+            "window_azimuth": window_azi,
+            "fov_left": fov_left,
+            "fov_right": fov_right,
+            "azimuth_min": azi_min,
+            "azimuth_max": azi_max,
+            "in_fov": self._check_azimuth_in_fov(azi_min, azi_max),
+        }
+
+    def _check_azimuth_in_fov(self, azi_min: float, azi_max: float) -> bool:
+        """Check if current sun azimuth is within field of view."""
+        sun_azimuth = self.data.diagnostics.get("sun_azimuth")
+        if sun_azimuth is None:
+            return False
+
+        # Handle wraparound (FOV crosses 0/360 boundary)
+        if azi_min <= azi_max:
+            return azi_min <= sun_azimuth <= azi_max
+        else:
+            return sun_azimuth >= azi_min or sun_azimuth <= azi_max
+
+    def _build_elevation_attributes(self) -> dict[str, Any] | None:
+        """Build attributes for sun elevation sensor."""
+        config = self.data.diagnostics.get("configuration", {})
+        min_elev = config.get("min_elevation")
+        max_elev = config.get("max_elevation")
+
+        attrs = {
+            "valid_elevation": self.data.diagnostics.get("sun_validity", {}).get("valid_elevation"),
+        }
+
+        # Only include min/max if configured
+        if min_elev is not None:
+            attrs["min_elevation"] = min_elev
+        if max_elev is not None:
+            attrs["max_elevation"] = max_elev
+
+        # Include blind spot if enabled
+        if config.get("enable_blind_spot", False):
+            blind_spot_elev = config.get("blind_spot_elevation")
+            if blind_spot_elev is not None:
+                attrs["blind_spot_elevation"] = blind_spot_elev
+                attrs["in_blind_spot"] = self.data.diagnostics.get("sun_validity", {}).get("in_blind_spot", False)
+
+        return attrs
+
+    def _build_gamma_attributes(self) -> dict[str, Any] | None:
+        """Build attributes for gamma sensor."""
+        gamma = self.data.diagnostics.get("gamma")
+        if gamma is None:
+            return None
+
+        # Gamma interpretation
+        abs_gamma = abs(gamma)
+        if abs_gamma < 10:
+            interpretation = "nearly perpendicular"
+        elif abs_gamma < 45:
+            interpretation = "oblique angle"
+        elif abs_gamma < 80:
+            interpretation = "steep angle"
+        else:
+            interpretation = "nearly parallel"
+
+        attrs = {
+            "interpretation": interpretation,
+            "absolute_angle": abs_gamma,
+            "direction": "left" if gamma < 0 else "right" if gamma > 0 else "center",
+        }
+
+        # Include blind spot range if configured
+        config = self.data.diagnostics.get("configuration", {})
+        if config.get("enable_blind_spot", False):
+            blind_spot_left = config.get("blind_spot_left")
+            blind_spot_right = config.get("blind_spot_right")
+            fov_left = config.get("fov_left")
+            if blind_spot_left is not None and blind_spot_right is not None and fov_left is not None:
+                left_edge = fov_left - blind_spot_left
+                right_edge = fov_left - blind_spot_right
+                attrs["blind_spot_range"] = [right_edge, left_edge]
+
+        return attrs
+
+    def _build_calculated_position_attributes(self) -> dict[str, Any] | None:
+        """Build attributes for calculated position sensor."""
+        config = self.data.diagnostics.get("configuration", {})
+        calculated = self.data.diagnostics.get("calculated_position")
+        if calculated is None:
+            return None
+
+        attrs = {
+            "final_position": self.data.states.get("state"),
+            "direct_sun_valid": self.data.states.get("sun_motion"),
+        }
+
+        # Show applied limits if they affected the result
+        min_pos = config.get("min_position")
+        max_pos = config.get("max_position")
+        enable_min = config.get("enable_min_position", False)
+        enable_max = config.get("enable_max_position", False)
+
+        if min_pos is not None and enable_min and calculated < min_pos:
+            attrs["min_limit_applied"] = min_pos
+            attrs["limited_by"] = "min_position"
+
+        if max_pos is not None and enable_max and calculated > max_pos:
+            attrs["max_limit_applied"] = max_pos
+            attrs["limited_by"] = "max_position"
+
+        # Show if inverse state is applied
+        if config.get("inverse_state", False):
+            attrs["inverse_state_enabled"] = True
+
+        # Show if interpolation is applied
+        if config.get("interpolation", False):
+            attrs["interpolation_enabled"] = True
+
+        # Show climate mode position if different
+        if self.data.diagnostics.get("calculated_position_climate") is not None:
+            climate_pos = self.data.diagnostics.get("calculated_position_climate")
+            if climate_pos != calculated:
+                attrs["climate_position"] = climate_pos
+
+        return attrs
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
@@ -515,7 +652,17 @@ class AdaptiveCoverDiagnosticSensor(
         if self.data.diagnostics is None:
             return None
 
-        # For sensors that have nested dict data, expose as attributes
+        # Route to sensor-specific attribute builders
+        if self._diagnostic_key == "sun_azimuth":
+            return self._build_azimuth_attributes()
+        elif self._diagnostic_key == "sun_elevation":
+            return self._build_elevation_attributes()
+        elif self._diagnostic_key == "gamma":
+            return self._build_gamma_attributes()
+        elif self._diagnostic_key == "calculated_position":
+            return self._build_calculated_position_attributes()
+
+        # For other sensors, check if dict data exists (time_window, sun_validity)
         if self._diagnostic_key in ["time_window", "sun_validity"]:
             return self.data.diagnostics.get(self._diagnostic_key)
 
@@ -578,6 +725,44 @@ class AdaptiveCoverDiagnosticEnumSensor(
         if self.data.diagnostics is None:
             return None
         return self.data.diagnostics.get(self._diagnostic_key)
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        """Return additional state attributes."""
+        if self.data.diagnostics is None:
+            return None
+
+        # Special handling for control_status sensor
+        if self._diagnostic_key == "control_status":
+            return self._build_control_status_attributes()
+
+        # No attributes for other enum sensors
+        return None
+
+    def _build_control_status_attributes(self) -> dict[str, Any] | None:
+        """Build attributes for control status sensor."""
+        attrs = {}
+
+        # Always show automatic control status
+        attrs["automatic_control_enabled"] = self.coordinator.automatic_control
+
+        control_status = self.data.diagnostics.get("control_status")
+
+        # Add context-specific attributes based on status
+        if control_status == "outside_time_window":
+            time_window = self.data.diagnostics.get("time_window", {})
+            attrs["after_start_time"] = time_window.get("after_start_time")
+            attrs["before_end_time"] = time_window.get("before_end_time")
+
+        elif control_status == "sun_not_visible":
+            sun_validity = self.data.diagnostics.get("sun_validity", {})
+            attrs["valid_elevation"] = sun_validity.get("valid_elevation")
+            attrs["in_blind_spot"] = sun_validity.get("in_blind_spot")
+
+        elif control_status == "manual_override":
+            attrs["manual_covers"] = self.data.states.get("manual_list", [])
+
+        return attrs if len(attrs) > 1 else None  # Return None if only automatic_control_enabled
 
     @property
     def device_info(self) -> DeviceInfo:
