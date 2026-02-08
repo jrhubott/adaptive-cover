@@ -1160,6 +1160,29 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             diagnostics["last_cover_action"] = self.last_cover_action.copy()
         return diagnostics
 
+    def _build_configuration_diagnostics(self) -> dict:
+        """Build configuration diagnostics for sensor attributes."""
+        options = self.config_entry.options
+        return {
+            "configuration": {
+                "azimuth": options.get(CONF_AZIMUTH),
+                "fov_left": options.get(CONF_FOV_LEFT),
+                "fov_right": options.get(CONF_FOV_RIGHT),
+                "min_elevation": options.get(CONF_MIN_ELEVATION),
+                "max_elevation": options.get(CONF_MAX_ELEVATION),
+                "enable_blind_spot": options.get(CONF_ENABLE_BLIND_SPOT, False),
+                "blind_spot_elevation": options.get(CONF_BLIND_SPOT_ELEVATION),
+                "blind_spot_left": options.get(CONF_BLIND_SPOT_LEFT),
+                "blind_spot_right": options.get(CONF_BLIND_SPOT_RIGHT),
+                "min_position": options.get(CONF_MIN_POSITION),
+                "max_position": options.get(CONF_MAX_POSITION),
+                "enable_min_position": options.get(CONF_ENABLE_MIN_POSITION, False),
+                "enable_max_position": options.get(CONF_ENABLE_MAX_POSITION, False),
+                "inverse_state": options.get(CONF_INVERSE_STATE, False),
+                "interpolation": options.get(CONF_INTERP, False),
+            }
+        }
+
     def build_diagnostic_data(self) -> dict:
         """Build diagnostic data for diagnostic sensors."""
         return {
@@ -1169,6 +1192,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             **self._build_sun_validity_diagnostics(),
             **self._build_climate_diagnostics(),
             **self._build_last_action_diagnostics(),
+            **self._build_configuration_diagnostics(),
         }
 
     def _determine_control_status(self) -> str:
