@@ -172,3 +172,29 @@ class ControlStatus:
     MANUAL_OVERRIDE = "manual_override"
     AUTOMATIC_CONTROL_OFF = "automatic_control_off"
     SUN_NOT_VISIBLE = "sun_not_visible"
+
+
+# Geometric accuracy constants (used in calculation.py for safety margins and edge cases)
+# Edge case thresholds for extreme sun positions
+EDGE_CASE_LOW_ELEVATION = 2.0  # degrees - minimum elevation for normal calculation
+EDGE_CASE_HIGH_ELEVATION = 88.0  # degrees - maximum elevation before using simplified calculation
+EDGE_CASE_EXTREME_GAMMA = 85  # degrees - maximum horizontal angle deviation
+
+# Safety margin thresholds and multipliers
+SAFETY_MARGIN_GAMMA_THRESHOLD = 45  # degrees - angle where gamma-based margins start
+SAFETY_MARGIN_GAMMA_MAX = 0.2  # 20% increase at extreme horizontal angles (>45°)
+SAFETY_MARGIN_LOW_ELEV_THRESHOLD = 10  # degrees - elevation where low-angle margins apply
+SAFETY_MARGIN_LOW_ELEV_MAX = 0.15  # 15% increase at low sun elevation (<10°)
+SAFETY_MARGIN_HIGH_ELEV_THRESHOLD = 75  # degrees - elevation where high-angle margins apply
+SAFETY_MARGIN_HIGH_ELEV_MAX = 0.1  # 10% increase at high sun elevation (>75°)
+
+# Window depth calculation threshold
+WINDOW_DEPTH_GAMMA_THRESHOLD = 10  # degrees - minimum gamma for window depth contribution
+
+# Climate mode constants
+CLIMATE_SUMMER_TILT_ANGLE = 45  # degrees - tilt angle for summer cooling strategy
+CLIMATE_DEFAULT_TILT_ANGLE = 80  # degrees - default tilt angle when not present
+
+# Cover position constants
+POSITION_CLOSED = 0  # Fully closed position
+POSITION_OPEN = 100  # Fully open position
