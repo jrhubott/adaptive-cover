@@ -16,20 +16,13 @@ from .config_context_adapter import ConfigContextAdapter
 from .const import (
     CLIMATE_DEFAULT_TILT_ANGLE,
     CLIMATE_SUMMER_TILT_ANGLE,
-    EDGE_CASE_EXTREME_GAMMA,
-    EDGE_CASE_HIGH_ELEVATION,
-    EDGE_CASE_LOW_ELEVATION,
     POSITION_CLOSED,
-    SAFETY_MARGIN_GAMMA_MAX,
-    SAFETY_MARGIN_GAMMA_THRESHOLD,
-    SAFETY_MARGIN_HIGH_ELEV_MAX,
-    SAFETY_MARGIN_HIGH_ELEV_THRESHOLD,
-    SAFETY_MARGIN_LOW_ELEV_MAX,
-    SAFETY_MARGIN_LOW_ELEV_THRESHOLD,
     WINDOW_DEPTH_GAMMA_THRESHOLD,
 )
 from .enums import CoverType, TiltMode
+from .geometry import EdgeCaseHandler, SafetyMarginCalculator
 from .helpers import get_domain, get_safe_state
+from .position_utils import PositionConverter
 from .sun import SunData
 
 
@@ -237,12 +230,15 @@ class NormalCoverState:
             state = self.cover.default
             self.cover.logger.debug("No sun in window: using default value (%s)", state)
 
-        result = np.clip(state, 0, 100)
-        if self.cover.apply_max_position and result > self.cover.max_pos:
-            return self.cover.max_pos
-        if self.cover.apply_min_position and result < self.cover.min_pos:
-            return self.cover.min_pos
-        return result
+        # Apply position limits using utility
+        return PositionConverter.apply_limits(
+            int(state),
+            self.cover.min_pos,
+            self.cover.max_pos,
+            self.cover.apply_min_position,
+            self.cover.apply_max_position,
+            dsv,
+        )
 
 
 @dataclass
@@ -544,21 +540,23 @@ class ClimateCoverState(NormalCoverState):
         )
         if is_tilt:
             result = self.tilt_state()
-        if self.cover.apply_max_position and result > self.cover.max_pos:
+
+        # Apply position limits using utility
+        final_result = PositionConverter.apply_limits(
+            result,
+            self.cover.min_pos,
+            self.cover.max_pos,
+            self.cover.apply_min_position,
+            self.cover.apply_max_position,
+            self.cover.direct_sun_valid,
+        )
+
+        if final_result != result:
             self.cover.logger.debug(
-                "Climate state: Max position applied (%s > %s)",
-                result,
-                self.cover.max_pos,
+                "Climate state: Position limit applied (%s -> %s)", result, final_result
             )
-            return self.cover.max_pos
-        if self.cover.apply_min_position and result < self.cover.min_pos:
-            self.cover.logger.debug(
-                "Climate state: Min position applied (%s < %s)",
-                result,
-                self.cover.min_pos,
-            )
-            return self.cover.min_pos
-        return result
+
+        return final_result
 
 
 @dataclass
@@ -574,9 +572,7 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
     def _calculate_safety_margin(self, gamma: float, sol_elev: float) -> float:
         """Calculate angle-dependent safety margin multiplier (≥1.0).
 
-        Increases blind extension at extreme angles to ensure effective sun blocking:
-        - Gamma margin: increases at extreme horizontal angles (>threshold)
-        - Elevation margin: increases at very low or high angles
+        Delegates to SafetyMarginCalculator utility class.
 
         Args:
             gamma: Surface solar azimuth in degrees (-180 to 180)
@@ -586,36 +582,12 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
             Safety margin multiplier (1.0 to 1.45)
 
         """
-        margin = 1.0
-
-        # Gamma margin: increases at extreme horizontal angles
-        gamma_abs = abs(gamma)
-        if gamma_abs > SAFETY_MARGIN_GAMMA_THRESHOLD:
-            # Normalized transition: 0 at threshold, 1 at 90°
-            t = (gamma_abs - SAFETY_MARGIN_GAMMA_THRESHOLD) / (
-                90 - SAFETY_MARGIN_GAMMA_THRESHOLD
-            )
-            t = np.clip(t, 0, 1)
-            smooth_t = t * t * (3 - 2 * t)  # Smoothstep interpolation
-            margin += SAFETY_MARGIN_GAMMA_MAX * smooth_t
-
-        # Elevation margin: increases at very low/high angles
-        if sol_elev < SAFETY_MARGIN_LOW_ELEV_THRESHOLD:
-            t = (SAFETY_MARGIN_LOW_ELEV_THRESHOLD - sol_elev) / SAFETY_MARGIN_LOW_ELEV_THRESHOLD
-            margin += SAFETY_MARGIN_LOW_ELEV_MAX * np.clip(t, 0, 1)
-        elif sol_elev > SAFETY_MARGIN_HIGH_ELEV_THRESHOLD:
-            t = (sol_elev - SAFETY_MARGIN_HIGH_ELEV_THRESHOLD) / (
-                90 - SAFETY_MARGIN_HIGH_ELEV_THRESHOLD
-            )
-            margin += SAFETY_MARGIN_HIGH_ELEV_MAX * np.clip(t, 0, 1)
-
-        return margin
+        return SafetyMarginCalculator.calculate(gamma, sol_elev)
 
     def _handle_edge_cases(self) -> tuple[bool, float]:
         """Handle extreme angles with safe fallbacks.
 
-        Provides robust behavior at edge cases where standard geometric
-        calculations become unstable or inaccurate.
+        Delegates to EdgeCaseHandler utility class.
 
         Returns:
             Tuple of (is_edge_case: bool, position: float)
@@ -623,20 +595,9 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
             - position: Safe fallback position (only valid if is_edge_case=True)
 
         """
-        # Very low elevation: sun nearly horizontal, full coverage safest
-        if self.sol_elev < EDGE_CASE_LOW_ELEVATION:
-            return (True, self.h_win)
-
-        # Extreme gamma: sun perpendicular to window, full coverage
-        if abs(self.gamma) > EDGE_CASE_EXTREME_GAMMA:
-            return (True, self.h_win)
-
-        # Very high elevation: sun nearly overhead, simplified calculation
-        if self.sol_elev > EDGE_CASE_HIGH_ELEVATION:
-            simple_height = self.distance * tan(rad(self.sol_elev))
-            return (True, np.clip(simple_height, 0, self.h_win))
-
-        return (False, 0.0)
+        return EdgeCaseHandler.check_and_handle(
+            self.sol_elev, self.gamma, self.distance, self.h_win
+        )
 
     def calculate_position(self) -> float:
         """Calculate blind height with enhanced geometric accuracy.
@@ -679,8 +640,7 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
         self.logger.debug(
             "Converting height to percentage: %s / %s * 100", position, self.h_win
         )
-        result = position / self.h_win * 100
-        return round(result)
+        return PositionConverter.to_percentage(position, self.h_win)
 
 
 @dataclass
@@ -705,8 +665,9 @@ class AdaptiveHorizontalCover(AdaptiveVerticalCover):
 
     def calculate_percentage(self) -> float:
         """Convert awn length to percentage or default value."""
-        result = self.calculate_position() / self.awn_length * 100
-        return round(result)
+        return PositionConverter.to_percentage(
+            self.calculate_position(), self.awn_length
+        )
 
 
 @dataclass
@@ -756,6 +717,4 @@ class AdaptiveTiltCover(AdaptiveGeneralCover):
             mode_enum = TiltMode(self.mode)
             max_degrees = mode_enum.max_degrees
 
-        percentage = position / max_degrees * 100
-
-        return round(percentage)
+        return PositionConverter.to_percentage(position, max_degrees)
