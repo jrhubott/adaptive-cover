@@ -590,15 +590,20 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             options.get(CONF_SUNSET_POS),
         )
         if self.automatic_control:
+            sunset_pos = (
+                inverse_state(options.get(CONF_SUNSET_POS))
+                if self._inverse_state
+                else options.get(CONF_SUNSET_POS)
+            )
             for cover in self.entities:
-                await self.async_set_manual_position(
-                    cover,
-                    (
-                        inverse_state(options.get(CONF_SUNSET_POS))
-                        if self._inverse_state
-                        else options.get(CONF_SUNSET_POS)
-                    ),
-                )
+                # Only move if delta is sufficient or it's a special position
+                if self.check_position_delta(cover, sunset_pos, options):
+                    await self.async_set_manual_position(cover, sunset_pos)
+                else:
+                    self.logger.debug(
+                        "Timed refresh: delta too small for %s, skipping",
+                        cover
+                    )
         else:
             self.logger.debug("Timed refresh but control toggle is off")
         self.timed_refresh = False
@@ -1407,6 +1412,19 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         if position_delta <= self._position_tolerance:
             # Position is correct, reset retry count
+            self._reset_retry_count(entity_id)
+            return
+
+        # Check if delta is sufficient before retrying
+        options = self.config_entry.options
+        if not self.check_position_delta(entity_id, target_position, options):
+            self.logger.debug(
+                "Position verification: delta too small for %s (current: %s, target: %s, min: %s%%)",
+                entity_id,
+                actual_position,
+                target_position,
+                self.min_change,
+            )
             self._reset_retry_count(entity_id)
             return
 
