@@ -3036,27 +3036,38 @@ class TestClimateCoverState:
 
 @pytest.mark.unit
 def test_tilt_data_cm_to_meter_conversion():
-    """Test that coordinator.tilt_data converts centimeters to meters.
+    """Test that ConfigurationService.get_tilt_data converts centimeters to meters.
 
     This is a critical test for Issue #5 - ensures the UI input in cm
     is correctly converted to meters for calculation formulas.
     """
-    from custom_components.adaptive_cover_pro.coordinator import AdaptiveDataUpdateCoordinator
+    from custom_components.adaptive_cover_pro.services.configuration_service import ConfigurationService
 
-    # Create a mock coordinator instance to test the method
-    coordinator = MagicMock(spec=AdaptiveDataUpdateCoordinator)
-    coordinator.config_entry = MagicMock()
-    coordinator.config_entry.data = {"name": "Test Tilt"}
+    # Create a mock configuration service instance
+    config_entry = MagicMock()
+    config_entry.data = {"name": "Test Tilt"}
+    logger = MagicMock()
+    hass = MagicMock()
 
-    # Use the actual tilt_data method
+    config_service = ConfigurationService(
+        hass,
+        config_entry,
+        logger,
+        "cover_tilt",
+        None,
+        None,
+        None,
+    )
+
+    # Use the actual get_tilt_data method
     options = {
         "slat_distance": 2.0,   # 2.0 cm (user input)
         "slat_depth": 2.5,      # 2.5 cm (user input)
         "tilt_mode": "mode2",
     }
 
-    # Call the actual method (not the mock)
-    result = AdaptiveDataUpdateCoordinator.tilt_data(coordinator, options)
+    # Call the actual method
+    result = config_service.get_tilt_data(options)
 
     # Should convert cm to meters
     assert result[0] == pytest.approx(0.02, abs=0.0001)    # 2.0 cm -> 0.02 m (distance)
@@ -3066,18 +3077,29 @@ def test_tilt_data_cm_to_meter_conversion():
 
 @pytest.mark.unit
 def test_tilt_data_warns_on_small_values(caplog):
-    """Test that coordinator.tilt_data warns when values are suspiciously small.
+    """Test that ConfigurationService.get_tilt_data warns when values are suspiciously small.
 
     Values < 0.1 likely indicate user entered meters (following old instructions)
     instead of centimeters.
     """
     import logging
-    from custom_components.adaptive_cover_pro.coordinator import AdaptiveDataUpdateCoordinator
+    from custom_components.adaptive_cover_pro.services.configuration_service import ConfigurationService
 
-    # Create a mock coordinator instance to test the method
-    coordinator = MagicMock(spec=AdaptiveDataUpdateCoordinator)
-    coordinator.config_entry = MagicMock()
-    coordinator.config_entry.data = {"name": "Test Tilt Small"}
+    # Create a mock configuration service instance
+    config_entry = MagicMock()
+    config_entry.data = {"name": "Test Tilt Small"}
+    logger = MagicMock()
+    hass = MagicMock()
+
+    config_service = ConfigurationService(
+        hass,
+        config_entry,
+        logger,
+        "cover_tilt",
+        None,
+        None,
+        None,
+    )
 
     # Use very small values (likely meters entered by mistake)
     options = {
@@ -3087,7 +3109,7 @@ def test_tilt_data_warns_on_small_values(caplog):
     }
 
     with caplog.at_level(logging.WARNING):
-        result = AdaptiveDataUpdateCoordinator.tilt_data(coordinator, options)
+        result = config_service.get_tilt_data(options)
 
     # Should still convert (0.02 cm -> 0.0002 m) but log warning
     assert result[0] == pytest.approx(0.0002, abs=0.00001)

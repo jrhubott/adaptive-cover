@@ -38,6 +38,7 @@ from homeassistant.helpers.template import state_attr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .config_context_adapter import ConfigContextAdapter
+from .services.configuration_service import ConfigurationService
 
 from .calculation import (
     AdaptiveHorizontalCover,
@@ -51,7 +52,6 @@ from .const import (
     _LOGGER,
     ATTR_POSITION,
     ATTR_TILT_POSITION,
-    CONF_AWNING_ANGLE,
     CONF_AZIMUTH,
     CONF_BLIND_SPOT_ELEVATION,
     CONF_BLIND_SPOT_LEFT,
@@ -60,8 +60,6 @@ from .const import (
     CONF_DEFAULT_HEIGHT,
     CONF_DELTA_POSITION,
     CONF_DELTA_TIME,
-    CONF_DISTANCE,
-    CONF_WINDOW_DEPTH,
     CONF_ENABLE_BLIND_SPOT,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_MAX_POSITION,
@@ -71,18 +69,12 @@ from .const import (
     CONF_ENTITIES,
     CONF_FOV_LEFT,
     CONF_FOV_RIGHT,
-    CONF_HEIGHT_WIN,
     CONF_INTERP,
     CONF_INTERP_END,
     CONF_INTERP_LIST,
     CONF_INTERP_LIST_NEW,
     CONF_INTERP_START,
     CONF_INVERSE_STATE,
-    CONF_IRRADIANCE_ENTITY,
-    CONF_IRRADIANCE_THRESHOLD,
-    CONF_LENGTH_AWNING,
-    CONF_LUX_ENTITY,
-    CONF_LUX_THRESHOLD,
     CONF_MANUAL_IGNORE_INTERMEDIATE,
     CONF_MANUAL_OVERRIDE_DURATION,
     CONF_MANUAL_OVERRIDE_RESET,
@@ -91,24 +83,11 @@ from .const import (
     CONF_MAX_POSITION,
     CONF_MIN_ELEVATION,
     CONF_MIN_POSITION,
-    CONF_OUTSIDE_THRESHOLD,
-    CONF_OUTSIDETEMP_ENTITY,
-    CONF_PRESENCE_ENTITY,
     CONF_RETURN_SUNSET,
     CONF_START_ENTITY,
     CONF_START_TIME,
-    CONF_SUNRISE_OFFSET,
     CONF_SUNSET_OFFSET,
     CONF_SUNSET_POS,
-    CONF_TEMP_ENTITY,
-    CONF_TEMP_HIGH,
-    CONF_TEMP_LOW,
-    CONF_TILT_DEPTH,
-    CONF_TILT_DISTANCE,
-    CONF_TILT_MODE,
-    CONF_TRANSPARENT_BLIND,
-    CONF_WEATHER_ENTITY,
-    CONF_WEATHER_STATE,
     CONF_OPEN_CLOSE_THRESHOLD,
     DOMAIN,
     ControlStatus,
@@ -205,6 +184,17 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         self._cached_options = None
         self._open_close_threshold = self.config_entry.options.get(CONF_OPEN_CLOSE_THRESHOLD, 50)
+
+        # Initialize configuration service
+        self._config_service = ConfigurationService(
+            self.hass,
+            self.config_entry,
+            self.logger,
+            self._cover_type,
+            self._temp_toggle,
+            self._lux_toggle,
+            self._irradiance_toggle,
+        )
 
         # Track last cover action for diagnostic sensor
         self.last_cover_action: dict[str, Any] = {
@@ -783,25 +773,25 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self.hass,
                 self.logger,
                 *self.pos_sun,
-                *self.common_data(options),
-                *self.vertical_data(options),
+                *self._config_service.get_common_data(options),
+                *self._config_service.get_vertical_data(options),
             )
         if self.is_awning_cover:
             cover_data = AdaptiveHorizontalCover(
                 self.hass,
                 self.logger,
                 *self.pos_sun,
-                *self.common_data(options),
-                *self.vertical_data(options),
-                *self.horizontal_data(options),
+                *self._config_service.get_common_data(options),
+                *self._config_service.get_vertical_data(options),
+                *self._config_service.get_horizontal_data(options),
             )
         if self.is_tilt_cover:
             cover_data = AdaptiveTiltCover(
                 self.hass,
                 self.logger,
                 *self.pos_sun,
-                *self.common_data(options),
-                *self.tilt_data(options),
+                *self._config_service.get_common_data(options),
+                *self._config_service.get_tilt_data(options),
             )
         return cover_data
 
@@ -972,56 +962,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             state_attr(self.hass, "sun.sun", "elevation"),
         ]
 
-    def common_data(self, options):
-        """Update shared parameters."""
-        return [
-            options.get(CONF_SUNSET_POS),
-            options.get(CONF_SUNSET_OFFSET),
-            options.get(CONF_SUNRISE_OFFSET, options.get(CONF_SUNSET_OFFSET)),
-            self.hass.config.time_zone,
-            options.get(CONF_FOV_LEFT),
-            options.get(CONF_FOV_RIGHT),
-            options.get(CONF_AZIMUTH),
-            options.get(CONF_DEFAULT_HEIGHT),
-            options.get(CONF_MAX_POSITION),
-            options.get(CONF_MIN_POSITION),
-            options.get(CONF_ENABLE_MAX_POSITION, False),
-            options.get(CONF_ENABLE_MIN_POSITION, False),
-            options.get(CONF_BLIND_SPOT_LEFT),
-            options.get(CONF_BLIND_SPOT_RIGHT),
-            options.get(CONF_BLIND_SPOT_ELEVATION),
-            options.get(CONF_ENABLE_BLIND_SPOT, False),
-            options.get(CONF_MIN_ELEVATION, None),
-            options.get(CONF_MAX_ELEVATION, None),
-        ]
-
-    def get_climate_data(self, options):
-        """Update climate data."""
-        return [
-            self.hass,
-            self.logger,
-            options.get(CONF_TEMP_ENTITY),
-            options.get(CONF_TEMP_LOW),
-            options.get(CONF_TEMP_HIGH),
-            options.get(CONF_PRESENCE_ENTITY),
-            options.get(CONF_WEATHER_ENTITY),
-            options.get(CONF_WEATHER_STATE),
-            options.get(CONF_OUTSIDETEMP_ENTITY),
-            self._temp_toggle,
-            self._cover_type,
-            options.get(CONF_TRANSPARENT_BLIND),
-            options.get(CONF_LUX_ENTITY),
-            options.get(CONF_IRRADIANCE_ENTITY),
-            options.get(CONF_LUX_THRESHOLD),
-            options.get(CONF_IRRADIANCE_THRESHOLD),
-            options.get(CONF_OUTSIDE_THRESHOLD),
-            self._lux_toggle,
-            self._irradiance_toggle,
-        ]
-
     def climate_mode_data(self, options, cover_data):
         """Update climate mode data and control method."""
-        climate = ClimateCoverData(*self.get_climate_data(options))
+        climate = ClimateCoverData(*self._config_service.get_climate_data(options))
         self.climate_state = round(ClimateCoverState(cover_data, climate).get_state())
         climate_data = ClimateCoverState(cover_data, climate).climate_data
         self.climate_data = climate_data  # Store for P1 diagnostics
@@ -1032,47 +975,6 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.logger.debug(
             "Climate mode control method was set to %s", self.control_method
         )
-
-    def vertical_data(self, options):
-        """Update data for vertical blinds."""
-        return [
-            options.get(CONF_DISTANCE),
-            options.get(CONF_HEIGHT_WIN),
-            options.get(CONF_WINDOW_DEPTH, 0.0),  # Default 0.0 for backward compatibility
-        ]
-
-    def horizontal_data(self, options):
-        """Update data for horizontal blinds."""
-        return [
-            options.get(CONF_LENGTH_AWNING),
-            options.get(CONF_AWNING_ANGLE),
-        ]
-
-    def tilt_data(self, options):
-        """Update data for tilted blinds.
-
-        Converts slat dimensions from centimeters (as entered in UI) to meters
-        (as required by calculation formulas).
-        """
-        depth = options.get(CONF_TILT_DEPTH)
-        distance = options.get(CONF_TILT_DISTANCE)
-
-        # Warn if values are suspiciously small (likely already in meters)
-        if depth < 0.1 or distance < 0.1:
-            _LOGGER.warning(
-                "Tilt cover '%s': slat dimensions are very small (depth=%s, distance=%s). "
-                "If you previously entered values in METERS, please reconfigure and enter in CENTIMETERS. "
-                "For example: 2.5cm slats should be entered as '2.5', not '0.025'.",
-                self.config_entry.data.get("name"),
-                depth,
-                distance,
-            )
-
-        return [
-            distance / 100,  # Convert cm to meters
-            depth / 100,     # Convert cm to meters
-            options.get(CONF_TILT_MODE),
-        ]
 
     def _build_solar_diagnostics(self) -> dict:
         """Build solar position diagnostics."""
