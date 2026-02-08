@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -11,9 +12,9 @@ from homeassistant.helpers.template import state_attr
 from numpy import cos, sin, tan
 from numpy import radians as rad
 
+from .config_context_adapter import ConfigContextAdapter
 from .helpers import get_domain, get_safe_state
 from .sun import SunData
-from .config_context_adapter import ConfigContextAdapter
 
 
 @dataclass
@@ -428,7 +429,7 @@ class ClimateCoverState(NormalCoverState):
             self.cover.logger.debug(
                 "n_w_p(): Low light or not sunny = use default position"
             )
-            return self.cover.default
+            return round(self.cover.default)
 
         # Priority 3: Summer with transparent blinds
         if is_summer and self.climate_data.transparent_blind:
@@ -438,9 +439,7 @@ class ClimateCoverState(NormalCoverState):
             return 0
 
         # Priority 4: Normal glare calculation
-        self.cover.logger.debug(
-            "n_w_p(): Use calculated position for glare control"
-        )
+        self.cover.logger.debug("n_w_p(): Use calculated position for glare control")
         return super().get_state()
 
     def normal_without_presence(self) -> int:
@@ -450,7 +449,7 @@ class ClimateCoverState(NormalCoverState):
                 return 0
             if self.climate_data.is_winter:
                 return 100
-        return self.cover.default
+        return round(self.cover.default)
 
     def tilt_with_presence(self, degrees: int) -> int:
         """Determine state for tilted blinds with occupants."""
@@ -459,9 +458,7 @@ class ClimateCoverState(NormalCoverState):
         if self.cover.valid:
             # Summer: partial closure for heat blocking
             if self.climate_data.is_summer:
-                self.cover.logger.debug(
-                    "tilt_w_p(): Summer mode = 45 degrees"
-                )
+                self.cover.logger.debug("tilt_w_p(): Summer mode = 45 degrees")
                 return round((45 / degrees) * 100)
 
             # Winter: Use calculated position for optimal light/heat
@@ -483,19 +480,18 @@ class ClimateCoverState(NormalCoverState):
                 return super().get_state()
 
         # Default: 80 degrees (mostly open)
-        self.cover.logger.debug(
-            "tilt_w_p(): Default = 80 degrees"
-        )
+        self.cover.logger.debug("tilt_w_p(): Default = 80 degrees")
         return round((80 / degrees) * 100)
 
     def tilt_without_presence(self, degrees: int) -> int:
         """Determine state for tilted blinds without occupants."""
-        beta = np.rad2deg(self.cover.beta)
-        if self.cover.valid:
+        tilt_cover = cast(AdaptiveTiltCover, self.cover)
+        beta = np.rad2deg(tilt_cover.beta)
+        if tilt_cover.valid:
             if self.climate_data.is_summer:
                 # block out all light in summer
                 return 0
-            if self.climate_data.is_winter and self.cover.mode == "mode2":
+            if self.climate_data.is_winter and tilt_cover.mode == "mode2":
                 # parallel to sun beams, not possible with single direction
                 return round((beta + 90) / degrees * 100)
             return round((80 / degrees) * 100)
@@ -503,8 +499,9 @@ class ClimateCoverState(NormalCoverState):
 
     def tilt_state(self):
         """Add tilt specific controls."""
+        tilt_cover = cast(AdaptiveTiltCover, self.cover)
         degrees = 90
-        if self.cover.mode == "mode2":
+        if tilt_cover.mode == "mode2":
             degrees = 180
         if self.climate_data.is_presence:
             return self.tilt_with_presence(degrees)
@@ -538,7 +535,9 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
 
     distance: float
     h_win: float
-    window_depth: float = 0.0  # Window reveal/frame depth (meters), default 0 = disabled
+    window_depth: float = (
+        0.0  # Window reveal/frame depth (meters), default 0 = disabled
+    )
 
     def _calculate_safety_margin(self, gamma: float, sol_elev: float) -> float:
         """Calculate angle-dependent safety margin multiplier (≥1.0).

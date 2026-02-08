@@ -82,12 +82,22 @@ class AdaptiveCoverButton(
         for entity in self._entities:
             if self.coordinator.manager.is_cover_manual(entity):
                 _LOGGER.debug("Resetting manual override for: %s", entity)
-                await self.coordinator.async_set_position(
-                    entity, self.coordinator.state
-                )
-                while self.coordinator.wait_for_target.get(entity):
-                    await asyncio.sleep(1)
-                self.coordinator._cancel_grace_period(entity)
+
+                # Check if delta is sufficient before moving
+                target_position = self.coordinator.state
+                options = self.coordinator.config_entry.options
+                if self.coordinator.check_position_delta(
+                    entity, target_position, options
+                ):
+                    await self.coordinator.async_set_position(entity, target_position)
+                    while self.coordinator.wait_for_target.get(entity):
+                        await asyncio.sleep(1)
+                else:
+                    _LOGGER.debug(
+                        "Manual override reset: delta too small for %s, skipping position change",
+                        entity,
+                    )
+
                 self.coordinator.manager.reset(entity)
             else:
                 _LOGGER.debug(

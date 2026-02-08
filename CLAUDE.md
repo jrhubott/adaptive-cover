@@ -121,10 +121,12 @@ git checkout -b <prefix>/<description>
 **Rules:**
 - ✅ ALWAYS create a feature branch FIRST (before any edits)
 - ✅ ALWAYS branch from `main` (never from other feature branches)
+- ✅ ALWAYS create a pull request after pushing the branch
 - ✅ Keep commits atomic and focused
 - ✅ Test changes on the feature branch
 - ❌ NEVER commit directly to `main` branch
 - ❌ NEVER skip feature branches "because it's a small change"
+- ❌ NEVER merge to main without a pull request
 
 ### Working with GitHub Issues
 
@@ -171,17 +173,138 @@ AttributeError that caused sensor to become unavailable.
 Fixes #123"
 ```
 
-**Step 4: Push and Merge**
+**Step 4: Push and Create Pull Request**
 ```bash
 # Push feature branch
 git push -u origin fix/issue-123-sensor-unavailable
 
-# Merge to main (after testing)
-git checkout main
-git merge fix/issue-123-sensor-unavailable
-git push origin main
+# Create pull request immediately after pushing
+# For issue-related branches, link PR to the issue
+gh pr create --title "fix: Short description of fix (#123)" \
+             --body "Fixes #123" \
+             --base main
 
-# Issue auto-closes when pushed to main
+# Or for non-issue branches
+gh pr create --title "fix: Short description of fix" \
+             --base main
+
+# The PR description should include:
+# - Summary of changes
+# - Testing performed
+# - Related issues (Fixes #123, Related to #456)
+```
+
+**Pull Request Guidelines:**
+- ✅ ALWAYS create a PR after pushing a branch
+- ✅ Link PRs to issues using "Fixes #123" in the PR body
+- ✅ Use descriptive PR titles matching the commit convention (fix:, feat:, docs:)
+- ✅ Include testing details in PR description
+- ❌ NEVER merge branches directly without a PR
+- ❌ NEVER skip PR creation "because it's a small change"
+
+**Merging:**
+- Only merge PRs to main after review and all checks pass
+- Use GitHub UI or: `gh pr merge <PR-number> --squash` (or --merge/--rebase)
+- Issues will auto-close when PR is merged if "Fixes #123" is in PR body
+
+### Pull Request Workflow
+
+**CRITICAL: All branches MUST have a pull request before merging to main.**
+
+**When to Create a PR:**
+- ✅ Immediately after pushing any feature/fix/docs branch
+- ✅ For ALL branches, regardless of size or complexity
+- ✅ Even for single-commit changes
+
+**PR Creation Process:**
+
+1. **After pushing branch:**
+   ```bash
+   # If addressing an issue
+   gh pr create --title "fix: Description of fix (#123)" \
+                --body "## Summary
+
+   Brief description of changes
+
+   ## Testing
+   - Tested scenario 1
+   - Tested scenario 2
+
+   ## Related Issues
+   Fixes #123" \
+                --base main
+
+   # If NOT addressing a specific issue
+   gh pr create --title "feat: Description of feature" \
+                --body "## Summary
+
+   Brief description of changes
+
+   ## Testing
+   - Tested scenario 1
+   - Tested scenario 2" \
+                --base main
+   ```
+
+2. **PR Title Format:**
+   - Use conventional commit format: `fix:`, `feat:`, `docs:`, `chore:`, `test:`
+   - Include issue number if applicable: `fix: Description (#123)`
+   - Keep under 70 characters
+
+3. **PR Body Requirements:**
+   - **Summary:** What changed and why
+   - **Testing:** What was tested and results
+   - **Related Issues:** Use `Fixes #123` to auto-close issues when PR merges
+
+4. **Linking PRs to Issues:**
+   - Use keywords in PR body: `Fixes #123`, `Closes #123`, `Resolves #123`
+   - Multiple issues: `Fixes #123, Fixes #456`
+   - Non-closing reference: `Related to #123`, `Part of #123`
+   - Issue will automatically close when PR is merged to main
+
+**Example PR Body Template:**
+```markdown
+## Summary
+
+Added 30-second startup grace period to prevent false manual override
+detection when Home Assistant restarts and covers respond slowly.
+
+## Testing
+
+- ✅ All 248 tests passing
+- ✅ 8 new tests for startup grace period
+- ✅ Linting clean
+- ✅ Tested HA restart scenario with slow-responding covers
+
+## Related Issues
+
+Fixes #11
+```
+
+**Common PR Operations:**
+```bash
+# View PR details
+gh pr view
+
+# Check PR status (from any branch)
+gh pr status
+
+# View PR in browser
+gh pr view --web
+
+# List all open PRs
+gh pr list
+
+# Add reviewers
+gh pr edit --add-reviewer username
+
+# Update PR title
+gh pr edit --title "New title"
+
+# Merge PR (after approval)
+gh pr merge --squash    # Squash commits (recommended)
+gh pr merge --merge     # Standard merge
+gh pr merge --rebase    # Rebase and merge
 ```
 
 ### Merging and Release Workflow
@@ -190,26 +313,27 @@ git push origin main
 
 **When Exiting Plan Mode:**
 - ✅ ALWAYS ask the user if they want to:
-  1. Merge the feature/fix branch back into main
-  2. Create a production release
+  1. Create a pull request (if not already created)
+  2. Merge the PR and create a production release
   3. Create a beta release (without merging to main)
 - Use the AskUserQuestion tool to present these options
-- Wait for user confirmation before proceeding with merge or release
+- Wait for user confirmation before proceeding with PR creation, merge, or release
 
 **When NOT in Plan Mode (ad-hoc changes):**
+- ✅ Create a pull request after pushing changes (always required)
 - ✅ Stay on the feature/fix branch after pushing changes
 - ❌ DO NOT ask about merging to main
 - ❌ DO NOT merge automatically
-- The user will decide when to merge separately
+- The user will decide when to merge the PR separately
 
 **Example Question (Plan Mode Only):**
 ```
 After completing the implementation, ask:
-"The changes have been committed to the feature branch. What would you like to do next?"
+"The changes have been committed and pushed to the feature branch. What would you like to do next?"
 
 Options:
-1. Merge to main and create production release
-2. Merge to main only (no release)
+1. Create a pull request (linking to issue #123 if applicable)
+2. Create a pull request and merge to main
 3. Create a beta release (stay on feature branch)
 4. Stay on feature branch for more testing
 ```
@@ -223,7 +347,12 @@ Options:
 | List by label | `gh issue list --label bug` |
 | Add comment | `gh issue comment 123 --body "Message"` |
 | Close manually | `gh issue close 123 --comment "Fixed in v2.6.8"` |
-| Create PR | `gh pr create --title "Fix: Description (#123)"` |
+| Create PR | `gh pr create --title "Fix: Description (#123)" --body "Fixes #123"` |
+| Link PR to issue | Include "Fixes #123" in PR body |
+| View PR | `gh pr view 456` |
+| List PRs | `gh pr list` |
+| Merge PR | `gh pr merge 456 --squash` (or --merge/--rebase) |
+| Check PR status | `gh pr status` |
 
 ### Commit Message Guidelines
 

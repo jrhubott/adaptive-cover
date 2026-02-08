@@ -11,9 +11,10 @@ from homeassistant.config_entries import (
     ConfigFlow,
     OptionsFlow,
 )
-from homeassistant.core import callback, HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import entity_registry as er, selector
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import selector
 
 from .const import (
     CONF_AWNING_ANGLE,
@@ -26,9 +27,10 @@ from .const import (
     CONF_DELTA_POSITION,
     CONF_DELTA_TIME,
     CONF_DISTANCE,
-    CONF_WINDOW_DEPTH,
     CONF_ENABLE_BLIND_SPOT,
     CONF_ENABLE_DIAGNOSTICS,
+    CONF_ENABLE_MAX_POSITION,
+    CONF_ENABLE_MIN_POSITION,
     CONF_END_ENTITY,
     CONF_END_TIME,
     CONF_ENTITIES,
@@ -50,11 +52,13 @@ from .const import (
     CONF_MANUAL_OVERRIDE_DURATION,
     CONF_MANUAL_OVERRIDE_RESET,
     CONF_MANUAL_THRESHOLD,
-    CONF_OPEN_CLOSE_THRESHOLD,
     CONF_MAX_ELEVATION,
     CONF_MAX_POSITION,
     CONF_MIN_ELEVATION,
+    CONF_MIN_POSITION,
     CONF_MODE,
+    CONF_OPEN_CLOSE_THRESHOLD,
+    CONF_OUTSIDE_THRESHOLD,
     CONF_OUTSIDETEMP_ENTITY,
     CONF_PRESENCE_ENTITY,
     CONF_RETURN_SUNSET,
@@ -73,14 +77,11 @@ from .const import (
     CONF_TRANSPARENT_BLIND,
     CONF_WEATHER_ENTITY,
     CONF_WEATHER_STATE,
-    CONF_OUTSIDE_THRESHOLD,
-    DOMAIN,
-    SensorType,
-    CONF_MIN_POSITION,
-    CONF_ENABLE_MAX_POSITION,
-    CONF_ENABLE_MIN_POSITION,
+    CONF_WINDOW_DEPTH,
     DIRECT_MAPPING_FIELDS,
+    DOMAIN,
     LEGACY_DOMAIN,
+    SensorType,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -111,60 +112,103 @@ OPTIONS = vol.Schema(
     {
         vol.Required(CONF_AZIMUTH, default=180): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=359, mode="slider", unit_of_measurement="°"
+                min=0,
+                max=359,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="°",
             )
         ),
         vol.Required(CONF_DEFAULT_HEIGHT, default=60): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=100, step=1, mode="slider", unit_of_measurement="%"
+                min=0,
+                max=100,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="%",
             )
         ),
         vol.Optional(CONF_MAX_POSITION): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=1, max=100, step=1, mode="slider", unit_of_measurement="%"
+                min=1,
+                max=100,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="%",
             )
         ),
-        vol.Optional(CONF_ENABLE_MAX_POSITION, default=False): selector.BooleanSelector(),
+        vol.Optional(
+            CONF_ENABLE_MAX_POSITION, default=False
+        ): selector.BooleanSelector(),
         vol.Optional(CONF_MIN_POSITION): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=99, step=1, mode="slider", unit_of_measurement="%"
+                min=0,
+                max=99,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="%",
             )
         ),
-        vol.Optional(CONF_ENABLE_MIN_POSITION, default=False): selector.BooleanSelector(),
+        vol.Optional(
+            CONF_ENABLE_MIN_POSITION, default=False
+        ): selector.BooleanSelector(),
         vol.Optional(CONF_MIN_ELEVATION): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=90, step=1, mode="slider", unit_of_measurement="°"
+                min=0,
+                max=90,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="°",
             )
         ),
         vol.Optional(CONF_MAX_ELEVATION): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=90, step=1, mode="slider", unit_of_measurement="°"
+                min=0,
+                max=90,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="°",
             )
         ),
         vol.Required(CONF_FOV_LEFT, default=90): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=180, step=1, mode="slider", unit_of_measurement="°"
+                min=0,
+                max=180,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="°",
             )
         ),
         vol.Required(CONF_FOV_RIGHT, default=90): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=180, step=1, mode="slider", unit_of_measurement="°"
+                min=0,
+                max=180,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="°",
             )
         ),
         vol.Required(CONF_SUNSET_POS, default=0): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=100, step=1, mode="slider", unit_of_measurement="%"
+                min=0,
+                max=100,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="%",
             )
         ),
         vol.Required(CONF_SUNSET_OFFSET, default=0): selector.NumberSelector(
-            selector.NumberSelectorConfig(mode="box", unit_of_measurement="minutes")
+            selector.NumberSelectorConfig(
+                mode=selector.NumberSelectorMode.BOX, unit_of_measurement="minutes"
+            )
         ),
         vol.Required(CONF_SUNRISE_OFFSET, default=0): selector.NumberSelector(
-            selector.NumberSelectorConfig(mode="box", unit_of_measurement="minutes")
+            selector.NumberSelectorConfig(
+                mode=selector.NumberSelectorMode.BOX, unit_of_measurement="minutes"
+            )
         ),
-        vol.Required(CONF_INVERSE_STATE, default=False): bool,
-        vol.Required(CONF_ENABLE_BLIND_SPOT, default=False): bool,
-        vol.Required(CONF_INTERP, default=False): bool,
+        vol.Required(CONF_INVERSE_STATE, default=False): selector.BooleanSelector(),
+        vol.Required(CONF_ENABLE_BLIND_SPOT, default=False): selector.BooleanSelector(),
+        vol.Required(CONF_INTERP, default=False): selector.BooleanSelector(),
     }
 )
 
@@ -180,12 +224,20 @@ VERTICAL_OPTIONS = vol.Schema(
         ),
         vol.Required(CONF_HEIGHT_WIN, default=2.1): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0.1, max=6, step=0.01, mode="slider", unit_of_measurement="m"
+                min=0.1,
+                max=6,
+                step=0.01,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="m",
             )
         ),
         vol.Required(CONF_DISTANCE, default=0.5): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0.1, max=5, step=0.1, mode="slider", unit_of_measurement="m"
+                min=0.1,
+                max=5,
+                step=0.1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="m",
             )
         ),
         vol.Optional(CONF_WINDOW_DEPTH, default=0.0): selector.NumberSelector(
@@ -205,12 +257,19 @@ HORIZONTAL_OPTIONS = vol.Schema(
     {
         vol.Required(CONF_LENGTH_AWNING, default=2.1): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0.3, max=6, step=0.01, mode="slider", unit_of_measurement="m"
+                min=0.3,
+                max=6,
+                step=0.01,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="m",
             )
         ),
         vol.Required(CONF_AWNING_ANGLE, default=0): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=45, mode="slider", unit_of_measurement="°"
+                min=0,
+                max=45,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="°",
             )
         ),
     }
@@ -229,12 +288,20 @@ TILT_OPTIONS = vol.Schema(
         ),
         vol.Required(CONF_TILT_DEPTH, default=3): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0.1, max=15, step=0.1, mode="slider", unit_of_measurement="cm"
+                min=0.1,
+                max=15,
+                step=0.1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="cm",
             )
         ),
         vol.Required(CONF_TILT_DISTANCE, default=2): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0.1, max=15, step=0.1, mode="slider", unit_of_measurement="cm"
+                min=0.1,
+                max=15,
+                step=0.1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="cm",
             )
         ),
         vol.Required(CONF_TILT_MODE, default="mode2"): selector.SelectSelector(
@@ -252,12 +319,20 @@ CLIMATE_OPTIONS = vol.Schema(
         ),
         vol.Required(CONF_TEMP_LOW, default=21): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=86, step=1, mode="slider", unit_of_measurement="°"
+                min=0,
+                max=86,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="°",
             )
         ),
         vol.Required(CONF_TEMP_HIGH, default=25): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=90, step=1, mode="slider", unit_of_measurement="°"
+                min=0,
+                max=90,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="°",
             )
         ),
         vol.Optional(
@@ -281,7 +356,9 @@ CLIMATE_OPTIONS = vol.Schema(
             )
         ),
         vol.Optional(CONF_LUX_THRESHOLD, default=1000): selector.NumberSelector(
-            selector.NumberSelectorConfig(mode="box", unit_of_measurement="lux")
+            selector.NumberSelectorConfig(
+                mode=selector.NumberSelectorMode.BOX, unit_of_measurement="lux"
+            )
         ),
         vol.Optional(
             CONF_IRRADIANCE_ENTITY, default=vol.UNDEFINED
@@ -291,7 +368,9 @@ CLIMATE_OPTIONS = vol.Schema(
             )
         ),
         vol.Optional(CONF_IRRADIANCE_THRESHOLD, default=300): selector.NumberSelector(
-            selector.NumberSelectorConfig(mode="box", unit_of_measurement="W/m²")
+            selector.NumberSelectorConfig(
+                mode=selector.NumberSelectorMode.BOX, unit_of_measurement="W/m²"
+            )
         ),
         vol.Optional(CONF_TRANSPARENT_BLIND, default=False): selector.BooleanSelector(),
         vol.Optional(
@@ -338,12 +417,18 @@ AUTOMATION_CONFIG = vol.Schema(
     {
         vol.Required(CONF_DELTA_POSITION, default=1): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=1, max=90, step=1, mode="slider", unit_of_measurement="%"
+                min=1,
+                max=90,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="%",
             )
         ),
         vol.Optional(CONF_DELTA_TIME, default=2): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=2, mode="box", unit_of_measurement="minutes"
+                min=2,
+                mode=selector.NumberSelectorMode.BOX,
+                unit_of_measurement="minutes",
             )
         ),
         vol.Optional(CONF_START_TIME, default="00:00:00"): selector.TimeSelector(),
@@ -353,24 +438,38 @@ AUTOMATION_CONFIG = vol.Schema(
         vol.Required(
             CONF_MANUAL_OVERRIDE_DURATION, default={"minutes": 15}
         ): selector.DurationSelector(),
-        vol.Required(CONF_MANUAL_OVERRIDE_RESET, default=False): bool,
+        vol.Required(
+            CONF_MANUAL_OVERRIDE_RESET, default=False
+        ): selector.BooleanSelector(),
         vol.Optional(CONF_MANUAL_THRESHOLD): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=99, step=1, mode="slider", unit_of_measurement="%"
+                min=0,
+                max=99,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="%",
             )
         ),
-        vol.Optional(CONF_MANUAL_IGNORE_INTERMEDIATE, default=False): bool,
+        vol.Optional(
+            CONF_MANUAL_IGNORE_INTERMEDIATE, default=False
+        ): selector.BooleanSelector(),
         vol.Optional(CONF_OPEN_CLOSE_THRESHOLD, default=50): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=1, max=99, step=1, mode="slider", unit_of_measurement="%"
+                min=1,
+                max=99,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="%",
             )
         ),
         vol.Optional(CONF_END_TIME, default="00:00:00"): selector.TimeSelector(),
         vol.Optional(CONF_END_ENTITY): selector.EntitySelector(
             selector.EntitySelectorConfig(domain=["sensor", "input_datetime"])
         ),
-        vol.Optional(CONF_RETURN_SUNSET, default=False): bool,
-        vol.Optional(CONF_ENABLE_DIAGNOSTICS, default=False): bool,
+        vol.Optional(CONF_RETURN_SUNSET, default=False): selector.BooleanSelector(),
+        vol.Optional(
+            CONF_ENABLE_DIAGNOSTICS, default=False
+        ): selector.BooleanSelector(),
     }
 )
 
@@ -378,12 +477,20 @@ INTERPOLATION_OPTIONS = vol.Schema(
     {
         vol.Optional(CONF_INTERP_START): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=100, step=1, mode="slider", unit_of_measurement="%"
+                min=0,
+                max=100,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="%",
             )
         ),
         vol.Optional(CONF_INTERP_END): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=100, step=1, mode="slider", unit_of_measurement="%"
+                min=0,
+                max=100,
+                step=1,
+                mode=selector.NumberSelectorMode.SLIDER,
+                unit_of_measurement="%",
             )
         ),
         vol.Optional(CONF_INTERP_LIST, default=[]): selector.SelectSelector(
@@ -400,7 +507,7 @@ INTERPOLATION_OPTIONS = vol.Schema(
 )
 
 
-def _get_azimuth_edges(data) -> tuple[int, int]:
+def _get_azimuth_edges(data) -> int:
     """Calculate azimuth edges."""
     return data[CONF_FOV_LEFT] + data[CONF_FOV_RIGHT]
 
@@ -413,6 +520,10 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         self.type_blind: str | None = None
         self.config: dict[str, Any] = {}
         self.mode: str = "basic"
+        self.legacy_entries: list[dict[str, Any]] = []
+        self.selected_for_import: list[str] = []
+        self.import_index: int = 0
+        self.imported_count: int = 0
 
     @staticmethod
     @callback
@@ -434,9 +545,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 return self.async_show_menu(
                     step_id="user",
                     menu_options=["create_new", "import_legacy"],
-                    description_placeholders={
-                        "legacy_count": str(len(legacy_entries))
-                    }
+                    description_placeholders={"legacy_count": str(len(legacy_entries))},
                 )
 
         if user_input:
@@ -622,17 +731,27 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_BLIND_SPOT_LEFT, default=0): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        mode="slider", unit_of_measurement="°", min=0, max=edges - 1
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="°",
+                        min=0,
+                        max=edges - 1,
                     )
                 ),
                 vol.Required(CONF_BLIND_SPOT_RIGHT, default=1): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        mode="slider", unit_of_measurement="°", min=1, max=edges
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="°",
+                        min=1,
+                        max=edges,
                     )
                 ),
                 vol.Optional(CONF_BLIND_SPOT_ELEVATION): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        min=0, max=90, step=1, mode="slider", unit_of_measurement="°"
+                        min=0,
+                        max=90,
+                        step=1,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="°",
                     )
                 ),
             }
@@ -678,13 +797,17 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def async_step_update(self, user_input: dict[str, Any] | None = None):
         """Create entry."""
-        type = {
+        if self.type_blind is None:
+            msg = "type_blind must be set before calling async_step_update"
+            raise ValueError(msg)
+
+        type_mapping = {
             "cover_blind": "Vertical",
             "cover_awning": "Horizontal",
             "cover_tilt": "Tilt",
         }
         return self.async_create_entry(
-            title=f"{type[self.type_blind]} {self.config['name']}",
+            title=f"{type_mapping[self.type_blind]} {self.config['name']}",
             data={
                 "name": self.config["name"],
                 CONF_SENSOR_TYPE: self.type_blind,
@@ -694,9 +817,12 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 CONF_AZIMUTH: self.config.get(CONF_AZIMUTH),
                 CONF_HEIGHT_WIN: self.config.get(CONF_HEIGHT_WIN),
                 CONF_DISTANCE: self.config.get(CONF_DISTANCE),
+                CONF_WINDOW_DEPTH: self.config.get(CONF_WINDOW_DEPTH),
                 CONF_DEFAULT_HEIGHT: self.config.get(CONF_DEFAULT_HEIGHT),
                 CONF_MAX_POSITION: self.config.get(CONF_MAX_POSITION),
+                CONF_ENABLE_MAX_POSITION: self.config.get(CONF_ENABLE_MAX_POSITION),
                 CONF_MIN_POSITION: self.config.get(CONF_MIN_POSITION),
+                CONF_ENABLE_MIN_POSITION: self.config.get(CONF_ENABLE_MIN_POSITION),
                 CONF_FOV_LEFT: self.config.get(CONF_FOV_LEFT),
                 CONF_FOV_RIGHT: self.config.get(CONF_FOV_RIGHT),
                 CONF_ENTITIES: self.config.get(CONF_ENTITIES),
@@ -721,6 +847,8 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 CONF_DELTA_TIME: self.config.get(CONF_DELTA_TIME),
                 CONF_START_TIME: self.config.get(CONF_START_TIME),
                 CONF_START_ENTITY: self.config.get(CONF_START_ENTITY),
+                CONF_END_TIME: self.config.get(CONF_END_TIME),
+                CONF_END_ENTITY: self.config.get(CONF_END_ENTITY),
                 CONF_MANUAL_OVERRIDE_DURATION: self.config.get(
                     CONF_MANUAL_OVERRIDE_DURATION
                 ),
@@ -729,7 +857,9 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 CONF_MANUAL_IGNORE_INTERMEDIATE: self.config.get(
                     CONF_MANUAL_IGNORE_INTERMEDIATE
                 ),
-                CONF_OPEN_CLOSE_THRESHOLD: self.config.get(CONF_OPEN_CLOSE_THRESHOLD, 50),
+                CONF_OPEN_CLOSE_THRESHOLD: self.config.get(
+                    CONF_OPEN_CLOSE_THRESHOLD, 50
+                ),
                 CONF_BLIND_SPOT_RIGHT: self.config.get(CONF_BLIND_SPOT_RIGHT, None),
                 CONF_BLIND_SPOT_LEFT: self.config.get(CONF_BLIND_SPOT_LEFT, None),
                 CONF_BLIND_SPOT_ELEVATION: self.config.get(
@@ -752,16 +882,12 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             },
         )
 
-    async def async_step_create_new(
-        self, user_input: dict[str, Any] | None = None
-    ):
+    async def async_step_create_new(self, user_input: dict[str, Any] | None = None):
         """Handle create new configuration flow."""
         # Redirect to original user flow
         return await self.async_step_user(user_input)
 
-    async def async_step_import_legacy(
-        self, user_input: dict[str, Any] | None = None
-    ):
+    async def async_step_import_legacy(self, user_input: dict[str, Any] | None = None):
         """Handle import from legacy Adaptive Cover."""
         return await self.async_step_import_detect(user_input)
 
@@ -771,9 +897,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
 
         legacy_entries = hass.config_entries.async_entries(LEGACY_DOMAIN)
         return [
-            entry
-            for entry in legacy_entries
-            if entry.state == ConfigEntryState.LOADED
+            entry for entry in legacy_entries if entry.state == ConfigEntryState.LOADED
         ]
 
     async def _validate_imported_config(
@@ -835,10 +959,10 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         legacy_entries = await self._detect_legacy_entries(self.hass)
 
         if not legacy_entries:
-            return self.async_abort(reason="no_legacy_entries")
+            return self.async_abort(reason="no_legacy_entries")  # type: ignore[return-value]
 
-        # Store entries in flow context
-        self.context["legacy_entries"] = [
+        # Store entries in instance variable
+        self.legacy_entries = [
             {
                 "entry_id": e.entry_id,
                 "name": e.data.get("name"),
@@ -853,11 +977,11 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Allow user to select which entries to import."""
-        legacy_entries = self.context.get("legacy_entries", [])
+        legacy_entries = self.legacy_entries
 
         if user_input is not None:
             selected_ids = user_input.get("selected_entries", [])
-            self.context["selected_for_import"] = selected_ids
+            self.selected_for_import = selected_ids
             return await self.async_step_import_review()
 
         # Build selection schema with multi-select
@@ -888,10 +1012,10 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             if user_input.get("confirm"):
                 return await self.async_step_import_execute()
-            return self.async_abort(reason="user_cancelled")
+            return self.async_abort(reason="user_cancelled")  # type: ignore[return-value]
 
         # Load legacy entry details and validate
-        selected_ids = self.context.get("selected_for_import", [])
+        selected_ids = self.selected_for_import
         legacy_entries = self.hass.config_entries.async_entries(LEGACY_DOMAIN)
 
         preview_data = []
@@ -931,7 +1055,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
 
         # If validation errors, show error and abort
         if validation_errors:
-            return self.async_abort(
+            return self.async_abort(  # type: ignore[return-value]
                 reason="validation_failed",
                 description_placeholders={
                     "errors": "\n".join([f"• {e}" for e in validation_errors])
@@ -956,7 +1080,9 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="import_review",
-            data_schema=vol.Schema({vol.Required("confirm", default=True): bool}),
+            data_schema=vol.Schema(
+                {vol.Required("confirm", default=True): selector.BooleanSelector()}
+            ),
             description_placeholders={"entries_summary": "\n\n".join(entries_summary)},
         )
 
@@ -964,12 +1090,12 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Execute the import operation."""
-        selected_ids = self.context.get("selected_for_import", [])
+        selected_ids = self.selected_for_import
         if not selected_ids:
-            return self.async_abort(reason="no_entries_selected")
+            return self.async_abort(reason="no_entries_selected")  # type: ignore[return-value]
 
         # Get the current entry being processed (or start with the first)
-        current_index = self.context.get("import_index", 0)
+        current_index = getattr(self, "import_index", 0)
 
         if current_index >= len(selected_ids):
             # All entries processed, show completion
@@ -988,7 +1114,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 title="Adaptive Cover Pro Import Complete",
                 notification_id=f"adaptive_cover_pro_import_{imported_count}",
             )
-            return self.async_abort(reason="import_successful")
+            return self.async_abort(reason="import_successful")  # type: ignore[return-value]
 
         # Process current entry
         entry_id = selected_ids[current_index]
@@ -997,7 +1123,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
 
         if not legacy:
             # Skip this entry and move to next
-            self.context["import_index"] = current_index + 1
+            self.import_index = current_index + 1
             return await self.async_step_import_execute()
 
         # Map data (immutable setup info)
@@ -1024,9 +1150,9 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         sensor_type = new_data[CONF_SENSOR_TYPE]
         title = f"{type_labels.get(sensor_type, 'Unknown')} {new_data['name']}"
 
-        # Update context for next iteration
-        self.context["import_index"] = current_index + 1
-        self.context["imported_count"] = self.context.get("imported_count", 0) + 1
+        # Update tracking for next iteration
+        self.import_index = current_index + 1
+        self.imported_count += 1
 
         # Create the entry
         return self.async_create_entry(
@@ -1225,17 +1351,27 @@ class OptionsFlowHandler(OptionsFlow):
             {
                 vol.Required(CONF_BLIND_SPOT_LEFT, default=0): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        mode="slider", unit_of_measurement="°", min=0, max=edges - 1
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="°",
+                        min=0,
+                        max=edges - 1,
                     )
                 ),
                 vol.Required(CONF_BLIND_SPOT_RIGHT, default=1): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        mode="slider", unit_of_measurement="°", min=1, max=edges
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="°",
+                        min=1,
+                        max=edges,
                     )
                 ),
                 vol.Optional(CONF_BLIND_SPOT_ELEVATION): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        min=0, max=90, step=1, mode="slider", unit_of_measurement="°"
+                        min=0,
+                        max=90,
+                        step=1,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="°",
                     )
                 ),
             }
