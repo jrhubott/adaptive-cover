@@ -10,9 +10,9 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -179,12 +179,12 @@ class AdaptiveCoverPositionMismatchSensor(
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return additional attributes."""
-        attrs = {
+        attrs: dict[str, Any] = {
             "tolerance": self.coordinator._position_tolerance,
         }
 
         # Add per-entity details
-        entity_details = {}
+        entity_details: dict[str, dict[str, Any]] = {}
         for entity_id in self.coordinator.entities:
             target = self.coordinator.target_call.get(entity_id)
             actual = self.coordinator._get_current_position(entity_id)

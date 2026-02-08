@@ -59,7 +59,7 @@ def mock_logger():
 
 @pytest.fixture
 def base_cover_params(hass, mock_logger):
-    """Base parameters for AdaptiveVerticalCover."""
+    """Return base parameters for AdaptiveVerticalCover."""
     return {
         "hass": hass,
         "logger": mock_logger,
