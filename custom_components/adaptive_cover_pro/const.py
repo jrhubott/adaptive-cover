@@ -82,8 +82,9 @@ POSITION_CHECK_INTERVAL_MINUTES = 1  # Fixed interval for position verification
 POSITION_TOLERANCE_PERCENT = 3  # Fixed tolerance for position matching
 MAX_POSITION_RETRIES = 3  # Maximum retry attempts before giving up
 
-# Manual override detection grace period (fixed value, not configurable)
+# Manual override detection grace period (fixed values, not configurable)
 COMMAND_GRACE_PERIOD_SECONDS = 5.0  # Time to ignore position changes after command
+STARTUP_GRACE_PERIOD_SECONDS = 30.0  # Time to disable manual override detection on startup
 
 # Import flow constants
 LEGACY_DOMAIN = "adaptive_cover"

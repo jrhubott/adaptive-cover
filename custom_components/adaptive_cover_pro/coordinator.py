@@ -117,6 +117,7 @@ from .const import (
     POSITION_CHECK_INTERVAL_MINUTES,
     POSITION_TOLERANCE_PERCENT,
     COMMAND_GRACE_PERIOD_SECONDS,
+    STARTUP_GRACE_PERIOD_SECONDS,
 )
 from .helpers import (
     get_datetime_from_str,
@@ -205,6 +206,10 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._command_grace_period_seconds = COMMAND_GRACE_PERIOD_SECONDS
         self._command_timestamps: dict[str, float] = {}
         self._grace_period_tasks: dict[str, asyncio.Task] = {}
+        # Startup grace period tracking (global, not per-entity)
+        self._startup_grace_period_seconds = STARTUP_GRACE_PERIOD_SECONDS
+        self._startup_timestamp: float | None = None
+        self._startup_grace_period_task: asyncio.Task | None = None
         self._update_listener = None
         self._scheduled_time = dt.datetime.now()
 
@@ -303,6 +308,8 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.first_refresh = True
         await super().async_config_entry_first_refresh()
         self.logger.debug("Config entry first refresh")
+        # Start startup grace period to prevent false manual override detection
+        self._start_startup_grace_period()
         # Start position verification after first refresh
         self._start_position_verification()
 
@@ -457,6 +464,56 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         self._grace_period_tasks.pop(entity_id, None)
         self._command_timestamps.pop(entity_id, None)
+
+    def _is_in_startup_grace_period(self) -> bool:
+        """Check if integration is in startup grace period.
+
+        Returns:
+            True if in startup grace period, False otherwise
+
+        """
+        if self._startup_timestamp is None:
+            return False
+
+        elapsed = dt.datetime.now().timestamp() - self._startup_timestamp
+        return elapsed < self._startup_grace_period_seconds
+
+    def _start_startup_grace_period(self) -> None:
+        """Start startup grace period after first refresh.
+
+        Sets timestamp and schedules automatic clearing after grace period.
+        This prevents manual override detection during HA restart when covers
+        may respond slowly due to system initialization.
+
+        """
+        # Cancel any existing grace period task
+        if self._startup_grace_period_task and not self._startup_grace_period_task.done():
+            self._startup_grace_period_task.cancel()
+
+        # Record startup timestamp
+        self._startup_timestamp = dt.datetime.now().timestamp()
+
+        # Schedule automatic grace period expiration
+        self._startup_grace_period_task = asyncio.create_task(
+            self._startup_grace_period_timeout()
+        )
+
+        self.logger.info(
+            "Started %s second startup grace period (manual override detection disabled)",
+            self._startup_grace_period_seconds,
+        )
+
+    async def _startup_grace_period_timeout(self) -> None:
+        """Clear startup grace period after timeout."""
+        await asyncio.sleep(self._startup_grace_period_seconds)
+
+        # Clear tracking
+        self._startup_timestamp = None
+        self._startup_grace_period_task = None
+
+        self.logger.info(
+            "Startup grace period expired (manual override detection enabled)"
+        )
 
     @callback
     def _async_cancel_update_listener(self) -> None:
@@ -625,6 +682,17 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     async def async_handle_cover_state_change(self, state: int):
         """Handle state change from assigned covers."""
         if self.manual_toggle and self.automatic_control:
+            # Check startup grace period FIRST to prevent false manual override
+            # detection during HA restart when covers respond slowly
+            if self._is_in_startup_grace_period():
+                entity_id = self.state_change_data.entity_id
+                self.logger.debug(
+                    "Position change for %s ignored (in startup grace period)",
+                    entity_id,
+                )
+                self.cover_state_change = False
+                return
+
             # Get the entity_id from state_change_data
             entity_id = self.state_change_data.entity_id
 
