@@ -12,19 +12,16 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceEntryType
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_CLIMATE_MODE,
     CONF_ENABLE_DIAGNOSTICS,
-    CONF_SENSOR_TYPE,
     DOMAIN,
 )
 from .coordinator import AdaptiveDataUpdateCoordinator
+from .entity_base import AdaptiveCoverDiagnosticSensorBase, AdaptiveCoverSensorBase
 
 
 async def async_setup_entry(
@@ -245,16 +242,11 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class AdaptiveCoverSensorEntity(
-    CoordinatorEntity[AdaptiveDataUpdateCoordinator], SensorEntity
-):
+class AdaptiveCoverSensorEntity(AdaptiveCoverSensorBase, SensorEntity):
     """Adaptive Cover Pro Sensor."""
 
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = PERCENTAGE
-    _attr_icon = "mdi:sun-compass"
-    _attr_has_entity_name = True
-    _attr_should_poll = False
 
     def __init__(
         self,
@@ -265,27 +257,15 @@ class AdaptiveCoverSensorEntity(
         coordinator: AdaptiveDataUpdateCoordinator,
     ) -> None:
         """Initialize adaptive_cover Sensor."""
-        super().__init__(coordinator=coordinator)
-        self.type = {
-            "cover_blind": "Vertical",
-            "cover_awning": "Horizontal",
-            "cover_tilt": "Tilt",
-        }
-        self.coordinator = coordinator
-        self.data = self.coordinator.data
+        super().__init__(
+            unique_id,
+            hass,
+            config_entry,
+            coordinator,
+            "Cover_Position",
+            "mdi:sun-compass",
+        )
         self._sensor_name = "Cover Position"
-        self._attr_unique_id = f"{unique_id}_{self._sensor_name}"
-        self.hass = hass
-        self.config_entry = config_entry
-        self._name = name
-        self._device_name = self.type[self.config_entry.data[CONF_SENSOR_TYPE]]
-        self._device_id = unique_id
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.data = self.coordinator.data
-        self.async_write_ha_state()
 
     @property
     def name(self):
@@ -298,27 +278,14 @@ class AdaptiveCoverSensorEntity(
         return self.data.states["state"]
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            entry_type=DeviceEntryType.SERVICE,
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._name,
-        )
-
-    @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:  # noqa: D102
         return self.data.attributes
 
 
-class AdaptiveCoverTimeSensorEntity(
-    CoordinatorEntity[AdaptiveDataUpdateCoordinator], SensorEntity
-):
+class AdaptiveCoverTimeSensorEntity(AdaptiveCoverSensorBase, SensorEntity):
     """Adaptive Cover Pro Time Sensor."""
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _attr_has_entity_name = True
-    _attr_should_poll = False
 
     def __init__(
         self,
@@ -332,30 +299,9 @@ class AdaptiveCoverTimeSensorEntity(
         coordinator: AdaptiveDataUpdateCoordinator,
     ) -> None:
         """Initialize adaptive_cover Sensor."""
-        super().__init__(coordinator=coordinator)
-        self.type = {
-            "cover_blind": "Vertical",
-            "cover_awning": "Horizontal",
-            "cover_tilt": "Tilt",
-        }
-        self._attr_icon = icon
+        super().__init__(unique_id, hass, config_entry, coordinator, sensor_name, icon)
         self.key = key
-        self.coordinator = coordinator
-        self.data = self.coordinator.data
-        self._attr_unique_id = f"{unique_id}_{sensor_name}"
-        self._device_id = unique_id
-        self.hass = hass
-        self.config_entry = config_entry
-        self._name = name
-        self._cover_type = self.config_entry.data["sensor_type"]
         self._sensor_name = sensor_name
-        self._device_name = self.type[config_entry.data[CONF_SENSOR_TYPE]]
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.data = self.coordinator.data
-        self.async_write_ha_state()
 
     @property
     def name(self):
@@ -367,23 +313,10 @@ class AdaptiveCoverTimeSensorEntity(
         """Handle when entity is added."""
         return self.data.states[self.key]
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            entry_type=DeviceEntryType.SERVICE,
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._name,
-        )
 
-
-class AdaptiveCoverControlSensorEntity(
-    CoordinatorEntity[AdaptiveDataUpdateCoordinator], SensorEntity
-):
+class AdaptiveCoverControlSensorEntity(AdaptiveCoverSensorBase, SensorEntity):
     """Adaptive Cover Pro Control method Sensor."""
 
-    _attr_has_entity_name = True
-    _attr_should_poll = False
     _attr_translation_key = "control"
 
     def __init__(
@@ -395,29 +328,11 @@ class AdaptiveCoverControlSensorEntity(
         coordinator: AdaptiveDataUpdateCoordinator,
     ) -> None:
         """Initialize adaptive_cover Sensor."""
-        super().__init__(coordinator=coordinator)
-        self.type = {
-            "cover_blind": "Vertical",
-            "cover_awning": "Horizontal",
-            "cover_tilt": "Tilt",
-        }
-        self.coordinator = coordinator
-        self.data = self.coordinator.data
+        super().__init__(
+            unique_id, hass, config_entry, coordinator, "Control_Method", None
+        )
         self._sensor_name = "Control Method"
-        self._attr_unique_id = f"{unique_id}_{self._sensor_name}"
-        self._device_id = unique_id
         self.id = unique_id
-        self.hass = hass
-        self.config_entry = config_entry
-        self._name = name
-        self._cover_type = self.config_entry.data["sensor_type"]
-        self._device_name = self.type[config_entry.data[CONF_SENSOR_TYPE]]
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.data = self.coordinator.data
-        self.async_write_ha_state()
 
     @property
     def name(self):
@@ -429,24 +344,9 @@ class AdaptiveCoverControlSensorEntity(
         """Handle when entity is added."""
         return self.data.states["control"]
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            entry_type=DeviceEntryType.SERVICE,
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._name,
-        )
 
-
-class AdaptiveCoverDiagnosticSensor(
-    CoordinatorEntity[AdaptiveDataUpdateCoordinator], SensorEntity
-):
+class AdaptiveCoverDiagnosticSensor(AdaptiveCoverDiagnosticSensorBase, SensorEntity):
     """Adaptive Cover Pro Diagnostic Sensor."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_has_entity_name = True
-    _attr_should_poll = False
 
     def __init__(
         self,
@@ -462,31 +362,18 @@ class AdaptiveCoverDiagnosticSensor(
         state_class: SensorStateClass | None = None,
     ) -> None:
         """Initialize diagnostic sensor."""
-        super().__init__(coordinator=coordinator)
-        self.coordinator = coordinator
-        self.data = self.coordinator.data
+        super().__init__(
+            unique_id,
+            hass,
+            config_entry,
+            coordinator,
+            diagnostic_key,
+            icon,
+            unit,
+            state_class,
+        )
         self._sensor_name = sensor_name
         self._diagnostic_key = diagnostic_key
-        self._attr_unique_id = f"{unique_id}_{diagnostic_key}"
-        self._device_id = unique_id
-        self._attr_native_unit_of_measurement = unit
-        self._attr_icon = icon
-        self._attr_state_class = state_class
-        self.hass = hass
-        self.config_entry = config_entry
-        self._name = name
-        self.type = {
-            "cover_blind": "Vertical",
-            "cover_awning": "Horizontal",
-            "cover_tilt": "Tilt",
-        }
-        self._device_name = self.type[config_entry.data[CONF_SENSOR_TYPE]]
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.data = self.coordinator.data
-        self.async_write_ha_state()
 
     @property
     def name(self) -> str:
@@ -541,7 +428,9 @@ class AdaptiveCoverDiagnosticSensor(
         max_elev = config.get("max_elevation")
 
         attrs = {
-            "valid_elevation": self.data.diagnostics.get("sun_validity", {}).get("valid_elevation"),
+            "valid_elevation": self.data.diagnostics.get("sun_validity", {}).get(
+                "valid_elevation"
+            ),
         }
 
         # Only include min/max if configured
@@ -555,7 +444,9 @@ class AdaptiveCoverDiagnosticSensor(
             blind_spot_elev = config.get("blind_spot_elevation")
             if blind_spot_elev is not None:
                 attrs["blind_spot_elevation"] = blind_spot_elev
-                attrs["in_blind_spot"] = self.data.diagnostics.get("sun_validity", {}).get("in_blind_spot", False)
+                attrs["in_blind_spot"] = self.data.diagnostics.get(
+                    "sun_validity", {}
+                ).get("in_blind_spot", False)
 
         return attrs
 
@@ -588,7 +479,11 @@ class AdaptiveCoverDiagnosticSensor(
             blind_spot_left = config.get("blind_spot_left")
             blind_spot_right = config.get("blind_spot_right")
             fov_left = config.get("fov_left")
-            if blind_spot_left is not None and blind_spot_right is not None and fov_left is not None:
+            if (
+                blind_spot_left is not None
+                and blind_spot_right is not None
+                and fov_left is not None
+            ):
                 left_edge = fov_left - blind_spot_left
                 right_edge = fov_left - blind_spot_right
                 attrs["blind_spot_range"] = [right_edge, left_edge]
@@ -638,15 +533,6 @@ class AdaptiveCoverDiagnosticSensor(
         return attrs
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            entry_type=DeviceEntryType.SERVICE,
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._name,
-        )
-
-    @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return additional state attributes for complex diagnostic data."""
         if self.data.diagnostics is None:
@@ -670,13 +556,9 @@ class AdaptiveCoverDiagnosticSensor(
 
 
 class AdaptiveCoverDiagnosticEnumSensor(
-    CoordinatorEntity[AdaptiveDataUpdateCoordinator], SensorEntity
+    AdaptiveCoverDiagnosticSensorBase, SensorEntity
 ):
     """Adaptive Cover Pro Diagnostic Enum Sensor."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_has_entity_name = True
-    _attr_should_poll = False
 
     def __init__(
         self,
@@ -690,29 +572,11 @@ class AdaptiveCoverDiagnosticEnumSensor(
         icon: str,
     ) -> None:
         """Initialize diagnostic enum sensor."""
-        super().__init__(coordinator=coordinator)
-        self.coordinator = coordinator
-        self.data = self.coordinator.data
+        super().__init__(
+            unique_id, hass, config_entry, coordinator, diagnostic_key, icon
+        )
         self._sensor_name = sensor_name
         self._diagnostic_key = diagnostic_key
-        self._attr_unique_id = f"{unique_id}_{diagnostic_key}"
-        self._device_id = unique_id
-        self._attr_icon = icon
-        self.hass = hass
-        self.config_entry = config_entry
-        self._name = name
-        self.type = {
-            "cover_blind": "Vertical",
-            "cover_awning": "Horizontal",
-            "cover_tilt": "Tilt",
-        }
-        self._device_name = self.type[config_entry.data[CONF_SENSOR_TYPE]]
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.data = self.coordinator.data
-        self.async_write_ha_state()
 
     @property
     def name(self) -> str:
@@ -762,16 +626,9 @@ class AdaptiveCoverDiagnosticEnumSensor(
         elif control_status == "manual_override":
             attrs["manual_covers"] = self.data.states.get("manual_list", [])
 
-        return attrs if len(attrs) > 1 else None  # Return None if only automatic_control_enabled
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            entry_type=DeviceEntryType.SERVICE,
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._name,
-        )
+        return (
+            attrs if len(attrs) > 1 else None
+        )  # Return None if only automatic_control_enabled
 
 
 class AdaptiveCoverAdvancedDiagnosticSensor(AdaptiveCoverDiagnosticSensor):
@@ -795,8 +652,16 @@ class AdaptiveCoverAdvancedDiagnosticSensor(AdaptiveCoverDiagnosticSensor):
     ) -> None:
         """Initialize advanced diagnostic sensor."""
         super().__init__(
-            unique_id, hass, config_entry, name, coordinator,
-            sensor_name, diagnostic_key, unit, icon, state_class
+            unique_id,
+            hass,
+            config_entry,
+            name,
+            coordinator,
+            sensor_name,
+            diagnostic_key,
+            unit,
+            icon,
+            state_class,
         )
         if device_class:
             self._attr_device_class = device_class
