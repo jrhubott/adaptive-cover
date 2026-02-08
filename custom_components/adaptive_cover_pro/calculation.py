@@ -54,11 +54,11 @@ class AdaptiveGeneralCover(ABC):
     max_elevation: int
     sun_data: SunData = field(init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Add solar data to dataset."""
         self.sun_data = SunData(self.timezone, self.hass)
 
-    def solar_times(self):
+    def solar_times(self) -> tuple[datetime | None, datetime | None]:
         """Determine start/end times."""
         df_today = pd.DataFrame(
             {
@@ -172,7 +172,7 @@ class AdaptiveGeneralCover(ABC):
             default = self.sunset_pos
         return default
 
-    def fov(self) -> list:
+    def fov(self) -> list[int]:
         """Return field of view."""
         return [self.azi_min_abs, self.azi_max_abs]
 
@@ -266,7 +266,7 @@ class ClimateCoverData:
     _use_irradiance: bool
 
     @property
-    def outside_temperature(self):
+    def outside_temperature(self) -> str | float | None:
         """Get outside temperature."""
         temp = None
         if self.outside_entity:
@@ -279,7 +279,7 @@ class ClimateCoverData:
         return temp
 
     @property
-    def inside_temperature(self):
+    def inside_temperature(self) -> str | float | None:
         """Get inside temp from entity."""
         if self.temp_entity is not None:
             if get_domain(self.temp_entity) != "climate":
@@ -290,6 +290,7 @@ class ClimateCoverData:
             else:
                 temp = state_attr(self.hass, self.temp_entity, "current_temperature")
             return temp
+        return None
 
     @property
     def get_current_temperature(self) -> float | None:
@@ -302,7 +303,7 @@ class ClimateCoverData:
         return None
 
     @property
-    def is_presence(self):
+    def is_presence(self) -> bool:
         """Checks if people are present."""
         presence = None
         if self.presence_entity is not None:
@@ -410,7 +411,6 @@ class ClimateCoverState(NormalCoverState):
 
     def normal_type_cover(self) -> int:
         """Determine state for horizontal and vertical covers."""
-
         self.cover.logger.debug("Is presence? %s", self.climate_data.is_presence)
 
         if self.climate_data.is_presence:
@@ -518,7 +518,7 @@ class ClimateCoverState(NormalCoverState):
             return round((CLIMATE_DEFAULT_TILT_ANGLE / degrees) * 100)
         return super().get_state()
 
-    def tilt_state(self):
+    def tilt_state(self) -> int:
         """Add tilt specific controls."""
         tilt_cover = cast(AdaptiveTiltCover, self.cover)
         # Check for MODE2 (handles both string and enum)
@@ -679,7 +679,7 @@ class AdaptiveTiltCover(AdaptiveGeneralCover):
     mode: TiltMode | str  # Accept both TiltMode enum and string for backward compatibility
 
     @property
-    def beta(self):
+    def beta(self) -> float:
         """Calculate beta."""
         beta = np.arctan(tan(rad(self.sol_elev)) / cos(rad(self.gamma)))
         return beta
@@ -704,7 +704,7 @@ class AdaptiveTiltCover(AdaptiveGeneralCover):
 
         return result
 
-    def calculate_percentage(self):
+    def calculate_percentage(self) -> float:
         """Convert tilt angle to percentages or default value."""
         # 0 degrees is closed, 90 degrees is open (mode1), 180 degrees is closed (mode2)
         position = self.calculate_position()
