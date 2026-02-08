@@ -678,6 +678,54 @@ The Minimal Position and Maximum Position settings create boundaries for automat
 - **Minimum Position** (e.g., 20%): Prevents cover from fully closing, maintains some natural light, protects from jamming at bottom
 - **Maximum Position** (e.g., 80%): Prevents cover from fully opening, maintains some privacy/shade, protects from jamming at top
 
+#### Position Interpolation (Range Adjustment)
+
+Position Interpolation allows you to adjust how calculated positions (0-100%) map to actual cover positions sent to your devices. This is useful for covers with non-standard behavior or limited operating ranges.
+
+**When to use:**
+- Covers that don't respond across the full 0-100% range
+- Covers that need inverted operation (alternative to `inverse_state`)
+- Covers requiring non-linear position mapping
+
+**Simple Mode** (Start/End values):
+
+Configure two values to linearly map the 0-100% calculated range to a custom output range.
+
+| Use Case | Configuration | Result |
+|----------|---------------|--------|
+| **Limited Range Cover** | Start: 10%, End: 90% | 0% calculated → 10% sent<br>100% calculated → 90% sent<br>50% calculated → 50% sent |
+| **Inverted Operation** | Start: 100%, End: 0% | 0% calculated → 100% sent<br>100% calculated → 0% sent<br>50% calculated → 50% sent |
+| **Offset Range** | Start: 20%, End: 80% | 0% calculated → 20% sent<br>100% calculated → 80% sent<br>50% calculated → 50% sent |
+
+**Advanced Mode** (Point Lists):
+
+For non-linear mappings, define custom control points. Useful for covers with aggressive closing behavior or custom position curves.
+
+**Example - Aggressive Closing:**
+```
+Normal List:     [0, 25, 50, 75, 100]
+Interpolated List: [0, 15, 35, 60, 100]
+```
+
+This mapping causes the cover to close more aggressively:
+- 0% calc → 0% sent (no change)
+- 25% calc → 15% sent (closes more)
+- 50% calc → 35% sent (closes more)
+- 75% calc → 60% sent (closes more)
+- 100% calc → 100% sent (no change)
+
+**Example - Inverted with Custom Curve:**
+```
+Normal List:     [0, 25, 50, 75, 100]
+Interpolated List: [100, 75, 50, 25, 0]
+```
+
+**Important Notes:**
+- Interpolation is applied **AFTER** position calculation and **BEFORE** sending to cover
+- Works with both position-capable and open/close-only covers
+- Cannot be used together with `inverse_state` (choose one or the other)
+- List mode requires at least 2 points, values must be sorted ascending in Normal List
+
 ### Vertical
 
 | Variables         | Default | Range | Description                                                                                 |
