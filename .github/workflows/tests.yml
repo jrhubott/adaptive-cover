@@ -10,11 +10,11 @@ on:
 
 jobs:
   test:
-    name: Test (Python ${{ matrix.python-version }})
+    name: Test (Python 3.13)
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.13"]
 
     steps:
       - name: Checkout code
@@ -28,16 +28,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio pytest-cov
-          pip install pandas astral numpy python-dateutil
-          pip install 'homeassistant>=2024.3.0'
+          pip install -r requirements-dev.txt
 
       - name: Run tests with coverage
         run: |
           pytest --cov --cov-report=xml --cov-report=term
 
-      - name: Upload coverage to Codecov (Python 3.12 only)
-        if: matrix.python-version == '3.12'
+      - name: Upload coverage to Codecov (Python 3.13 only)
+        if: matrix.python-version == '3.13'
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml

@@ -337,10 +337,12 @@ adaptive-cover/
 │   └── manifest.json            # Integration metadata
 │
 ├── tests/                       # Unit tests (239 tests)
-├── docs/
+├── docs/                        # Documentation directory
 │   ├── ARCHITECTURE.md          # This file
+│   ├── CONTRIBUTING.md          # Contributing guidelines
 │   ├── DEVELOPMENT.md           # Developer documentation
-│   └── UNIT_TESTS.md            # Testing documentation
+│   ├── UNIT_TESTS.md            # Testing documentation
+│   └── VSCODE_TESTING_GUIDE.md  # VS Code testing guide
 ├── release_notes/               # Historical release notes
 └── scripts/                     # Development scripts
 ```
