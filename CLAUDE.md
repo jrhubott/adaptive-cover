@@ -510,14 +510,20 @@ cat > release_notes/v2.6.11.md << 'EOF'
 - Home Assistant 2024.5.0+
 EOF
 
-# 3. Create release
-./scripts/release patch --notes release_notes/v2.6.11.md --yes
-
-# 4. Commit the release notes to git
+# 3. Commit the release notes to git FIRST (release script requires clean working directory)
 git add release_notes/v2.6.11.md
 git commit -m "docs: Add release notes for v2.6.11"
-git push origin main
+
+# 4. Create release (handles version bump, tag, and push automatically)
+./scripts/release patch --notes release_notes/v2.6.11.md --yes
 ```
+
+**CRITICAL:** The release script requires a clean working directory. You MUST commit the release notes file before running the release script, not after. The release script will automatically:
+- Update manifest.json version
+- Create version bump commit
+- Create annotated git tag
+- Push both commits and tag to GitHub
+- Create GitHub release with ZIP asset
 
 **Quick beta release:**
 ```bash
