@@ -542,7 +542,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
 
             if legacy_entries:
                 # Show menu with import option
-                return self.async_show_menu(
+                return self.async_show_menu(  # type: ignore[return-value]
                     step_id="user",
                     menu_options=["create_new", "import_legacy"],
                     description_placeholders={"legacy_count": str(len(legacy_entries))},
@@ -985,7 +985,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             return await self.async_step_import_review()
 
         # Build selection schema with multi-select
-        return self.async_show_form(
+        return self.async_show_form(  # type: ignore[return-value]
             step_id="import_select",
             data_schema=vol.Schema(
                 {
@@ -1078,7 +1078,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 f"  - Automation: {p['delta_pos']}% threshold, {p['delta_time']} min intervals"
             )
 
-        return self.async_show_form(
+        return self.async_show_form(  # type: ignore[return-value]
             step_id="import_review",
             data_schema=vol.Schema(
                 {vol.Required("confirm", default=True): selector.BooleanSelector()}
@@ -1100,7 +1100,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         if current_index >= len(selected_ids):
             # All entries processed, show completion
             imported_count = self.context.get("imported_count", 0)
-            self.hass.components.persistent_notification.async_create(
+            self.hass.components.persistent_notification.async_create(  # type: ignore[attr-defined]
                 message=(
                     f"Successfully imported {imported_count} Adaptive Cover "
                     f"configuration(s) to Adaptive Cover Pro.\n\n"
@@ -1139,7 +1139,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 new_options[field] = legacy.options[field]
 
         # Ensure unique name
-        new_data["name"] = await self._ensure_unique_name(new_data["name"])
+        new_data["name"] = await self._ensure_unique_name(new_data["name"])  # type: ignore[arg-type]
 
         # Create title
         type_labels = {
@@ -1148,14 +1148,14 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             SensorType.TILT: "Tilt",
         }
         sensor_type = new_data[CONF_SENSOR_TYPE]
-        title = f"{type_labels.get(sensor_type, 'Unknown')} {new_data['name']}"
+        title = f"{type_labels.get(sensor_type, 'Unknown')} {new_data['name']}"  # type: ignore[arg-type]
 
         # Update tracking for next iteration
         self.import_index = current_index + 1
         self.imported_count += 1
 
         # Create the entry
-        return self.async_create_entry(
+        return self.async_create_entry(  # type: ignore[return-value]
             title=title,
             data=new_data,
             options=new_options,
@@ -1171,7 +1171,7 @@ class OptionsFlowHandler(OptionsFlow):
         self._config_entry = config_entry
         self.current_config: dict = dict(config_entry.data)
         self.options = dict(config_entry.options)
-        self.sensor_type: SensorType = (
+        self.sensor_type: SensorType = (  # type: ignore[misc]
             self.current_config.get(CONF_SENSOR_TYPE) or SensorType.BLIND
         )
 
@@ -1188,7 +1188,7 @@ class OptionsFlowHandler(OptionsFlow):
             options.append("blind_spot")
         if self.options.get(CONF_INTERP):
             options.append("interp")
-        return self.async_show_menu(step_id="init", menu_options=options)
+        return self.async_show_menu(step_id="init", menu_options=options)  # type: ignore[return-value]
 
     async def async_step_automation(self, user_input: dict[str, Any] | None = None):
         """Manage automation options."""
@@ -1430,9 +1430,9 @@ class OptionsFlowHandler(OptionsFlow):
 
     async def _update_options(self) -> FlowResult:
         """Update config entry options."""
-        return self.async_create_entry(title="", data=self.options)
+        return self.async_create_entry(title="", data=self.options)  # type: ignore[return-value]
 
-    def optional_entities(self, keys: list, user_input: dict[str, Any] | None = None):
+    def optional_entities(self, keys: list, user_input: dict[str, Any]):
         """Set value to None if key does not exist."""
         for key in keys:
             if key not in user_input:
