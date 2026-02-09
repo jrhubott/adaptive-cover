@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import _LOGGER, CONF_ENTITIES
+from .const import _LOGGER, CONF_ENTITIES, DOMAIN
 from .coordinator import AdaptiveDataUpdateCoordinator
 from .entity_base import AdaptiveCoverBaseEntity
 
@@ -20,8 +20,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the button platform."""
-    from .const import DOMAIN
-
     coordinator: AdaptiveDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]
