@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceEntryType
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_SENSOR_TYPE, DOMAIN
@@ -102,8 +102,6 @@ class AdaptiveCoverSensorBase(AdaptiveCoverBaseEntity):
 
 class AdaptiveCoverDiagnosticSensorBase(AdaptiveCoverSensorBase):
     """Base class for diagnostic sensors."""
-
-    from homeassistant.helpers.entity import EntityCategory
 
     _attr_entity_registry_enabled_default = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
