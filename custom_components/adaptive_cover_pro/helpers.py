@@ -45,17 +45,15 @@ def get_last_updated(entity_id: str, hass: HomeAssistant):
 
 
 def check_time_passed(time: dt.datetime):
-    """Check if time is passed for datetime.time()."""
-    now = dt.datetime.now().time()
-    return now >= time.time()
+    """Check if time is passed for datetime."""
+    now = dt.datetime.now()
+    return now >= time
 
 
 def dt_check_time_passed(time: dt.datetime):
-    """Check if time is passed today for UTC datetime."""
+    """Check if time is passed for UTC datetime."""
     now = dt.datetime.now(dt.UTC)
-    if now.date() == time.date():
-        return now.time() > time.time()
-    return True
+    return now >= time
 
 
 def check_cover_features(

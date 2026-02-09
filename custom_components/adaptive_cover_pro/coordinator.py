@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 import pytz
-from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
+from homeassistant.components.cover.const import DOMAIN as COVER_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -37,9 +37,6 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.template import state_attr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .config_context_adapter import ConfigContextAdapter
-from .services.configuration_service import ConfigurationService
-
 from .calculation import (
     AdaptiveHorizontalCover,
     AdaptiveTiltCover,
@@ -48,10 +45,14 @@ from .calculation import (
     ClimateCoverState,
     NormalCoverState,
 )
+from .config_context_adapter import ConfigContextAdapter
+from .services.configuration_service import ConfigurationService
 from .const import (
     _LOGGER,
     ATTR_POSITION,
     ATTR_TILT_POSITION,
+    COMMAND_GRACE_PERIOD_SECONDS,
+    CONF_AWNING_ANGLE,
     CONF_AZIMUTH,
     CONF_BLIND_SPOT_ELEVATION,
     CONF_BLIND_SPOT_LEFT,
@@ -60,6 +61,7 @@ from .const import (
     CONF_DEFAULT_HEIGHT,
     CONF_DELTA_POSITION,
     CONF_DELTA_TIME,
+    CONF_DISTANCE,
     CONF_ENABLE_BLIND_SPOT,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_MAX_POSITION,
@@ -83,25 +85,39 @@ from .const import (
     CONF_MAX_POSITION,
     CONF_MIN_ELEVATION,
     CONF_MIN_POSITION,
+    CONF_OPEN_CLOSE_THRESHOLD,
+    CONF_OUTSIDE_THRESHOLD,
+    CONF_OUTSIDETEMP_ENTITY,
+    CONF_PRESENCE_ENTITY,
     CONF_RETURN_SUNSET,
     CONF_START_ENTITY,
     CONF_START_TIME,
     CONF_SUNSET_OFFSET,
     CONF_SUNSET_POS,
-    CONF_OPEN_CLOSE_THRESHOLD,
+    CONF_TEMP_ENTITY,
+    CONF_TEMP_HIGH,
+    CONF_TEMP_LOW,
+    CONF_TILT_DEPTH,
+    CONF_TILT_DISTANCE,
+    CONF_TILT_MODE,
+    CONF_TRANSPARENT_BLIND,
+    CONF_WEATHER_ENTITY,
+    CONF_WEATHER_STATE,
+    CONF_WINDOW_DEPTH,
     DOMAIN,
-    ControlStatus,
     LOGGER,
     MAX_POSITION_RETRIES,
     POSITION_CHECK_INTERVAL_MINUTES,
     POSITION_TOLERANCE_PERCENT,
+    STARTUP_GRACE_PERIOD_SECONDS,
+    ControlStatus,
 )
 from .helpers import (
+    check_cover_features,
     get_datetime_from_str,
     get_last_updated,
-    get_safe_state,
-    check_cover_features,
     get_open_close_state,
+    get_safe_state,
 )
 
 
@@ -173,17 +189,29 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.control_method = "intermediate"
         self.state_change_data: StateChangedData | None = None
         self.raw_calculated_position = 0  # Store raw position for diagnostics
-        self.manager = AdaptiveCoverManager(self.hass, self.manual_duration, self.logger)
+        self.manager = AdaptiveCoverManager(
+            self.hass, self.manual_duration, self.logger
+        )
         self.wait_for_target = {}
         self.target_call = {}
         self.ignore_intermediate_states = self.config_entry.options.get(
             CONF_MANUAL_IGNORE_INTERMEDIATE, False
         )
+        # Command grace period tracking
+        self._command_grace_period_seconds = COMMAND_GRACE_PERIOD_SECONDS
+        self._command_timestamps: dict[str, float] = {}
+        self._grace_period_tasks: dict[str, asyncio.Task] = {}
+        # Startup grace period tracking (global, not per-entity)
+        self._startup_grace_period_seconds = STARTUP_GRACE_PERIOD_SECONDS
+        self._startup_timestamp: float | None = None
+        self._startup_grace_period_task: asyncio.Task | None = None
         self._update_listener = None
         self._scheduled_time = dt.datetime.now()
 
         self._cached_options = None
-        self._open_close_threshold = self.config_entry.options.get(CONF_OPEN_CLOSE_THRESHOLD, 50)
+        self._open_close_threshold = self.config_entry.options.get(
+            CONF_OPEN_CLOSE_THRESHOLD, 50
+        )
 
         # Initialize configuration service
         self._config_service = ConfigurationService(
@@ -211,7 +239,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         # Position verification tracking
         self._position_check_interval = None  # async_track_time_interval listener
         self._retry_counts: dict[str, int] = {}  # entity_id → retry count
-        self._last_verification: dict[str, dt.datetime] = {}  # entity_id → last check time
+        self._last_verification: dict[
+            str, dt.datetime
+        ] = {}  # entity_id → last check time
         self._check_interval_minutes = POSITION_CHECK_INTERVAL_MINUTES
         self._position_tolerance = POSITION_TOLERANCE_PERCENT
         self._max_retries = MAX_POSITION_RETRIES
@@ -288,6 +318,8 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.first_refresh = True
         await super().async_config_entry_first_refresh()
         self.logger.debug("Config entry first refresh")
+        # Start startup grace period to prevent false manual override detection
+        self._start_startup_grace_period()
         # Start position verification after first refresh
         self._start_position_verification()
 
@@ -349,7 +381,14 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.logger.debug("Ignoring intermediate state change for %s", entity_id)
             return
         if self.wait_for_target.get(entity_id):
-            # Check capabilities on-demand
+            # Check if still in grace period
+            if self._is_in_grace_period(entity_id):
+                self.logger.debug(
+                    "Position change for %s ignored (in grace period)", entity_id
+                )
+                return  # Ignore ALL position changes during grace period
+
+            # Grace period expired, check if we reached target
             caps = self._get_cover_capabilities(entity_id)
 
             # Get position based on capability
@@ -363,6 +402,131 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.logger.debug("Wait for target: %s", self.wait_for_target)
         else:
             self.logger.debug("No wait for target call for %s", entity_id)
+
+    def _is_in_grace_period(self, entity_id: str) -> bool:
+        """Check if entity is in command grace period.
+
+        Args:
+            entity_id: Entity to check
+
+        Returns:
+            True if in grace period, False otherwise
+
+        """
+        timestamp = self._command_timestamps.get(entity_id)
+        if timestamp is None:
+            return False
+
+        elapsed = dt.datetime.now().timestamp() - timestamp
+        return elapsed < self._command_grace_period_seconds
+
+    def _start_grace_period(self, entity_id: str) -> None:
+        """Start grace period for entity.
+
+        Sets timestamp and schedules automatic clearing after grace period.
+
+        Args:
+            entity_id: Entity to start grace period for
+
+        """
+        # Cancel any existing grace period task
+        self._cancel_grace_period(entity_id)
+
+        # Record command timestamp
+        now = dt.datetime.now().timestamp()
+        self._command_timestamps[entity_id] = now
+
+        # Schedule automatic grace period expiration
+        task = asyncio.create_task(self._grace_period_timeout(entity_id))
+        self._grace_period_tasks[entity_id] = task
+
+        self.logger.debug(
+            "Started %s second grace period for %s",
+            self._command_grace_period_seconds,
+            entity_id,
+        )
+
+    async def _grace_period_timeout(self, entity_id: str) -> None:
+        """Clear grace period after timeout.
+
+        Args:
+            entity_id: Entity whose grace period expired
+
+        """
+        await asyncio.sleep(self._command_grace_period_seconds)
+
+        # Clear tracking
+        self._command_timestamps.pop(entity_id, None)
+        self._grace_period_tasks.pop(entity_id, None)
+
+        self.logger.debug("Grace period expired for %s", entity_id)
+
+    def _cancel_grace_period(self, entity_id: str) -> None:
+        """Cancel grace period task for entity.
+
+        Args:
+            entity_id: Entity whose grace period to cancel
+
+        """
+        task = self._grace_period_tasks.get(entity_id)
+        if task and not task.done():
+            task.cancel()
+
+        self._grace_period_tasks.pop(entity_id, None)
+        self._command_timestamps.pop(entity_id, None)
+
+    def _is_in_startup_grace_period(self) -> bool:
+        """Check if integration is in startup grace period.
+
+        Returns:
+            True if in startup grace period, False otherwise
+
+        """
+        if self._startup_timestamp is None:
+            return False
+
+        elapsed = dt.datetime.now().timestamp() - self._startup_timestamp
+        return elapsed < self._startup_grace_period_seconds
+
+    def _start_startup_grace_period(self) -> None:
+        """Start startup grace period after first refresh.
+
+        Sets timestamp and schedules automatic clearing after grace period.
+        This prevents manual override detection during HA restart when covers
+        may respond slowly due to system initialization.
+
+        """
+        # Cancel any existing grace period task
+        if (
+            self._startup_grace_period_task
+            and not self._startup_grace_period_task.done()
+        ):
+            self._startup_grace_period_task.cancel()
+
+        # Record startup timestamp
+        self._startup_timestamp = dt.datetime.now().timestamp()
+
+        # Schedule automatic grace period expiration
+        self._startup_grace_period_task = asyncio.create_task(
+            self._startup_grace_period_timeout()
+        )
+
+        self.logger.info(
+            "Started %s second startup grace period (manual override detection disabled)",
+            self._startup_grace_period_seconds,
+        )
+
+    async def _startup_grace_period_timeout(self) -> None:
+        """Clear startup grace period after timeout."""
+        await asyncio.sleep(self._startup_grace_period_seconds)
+
+        # Clear tracking
+        self._startup_timestamp = None
+        self._startup_grace_period_task = None
+
+        self.logger.info(
+            "Startup grace period expired (manual override detection enabled)"
+        )
 
     @callback
     def _async_cancel_update_listener(self) -> None:
@@ -425,7 +589,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         return self.state
 
-    async def _update_solar_times_if_needed(self, normal_cover) -> tuple[dt.datetime, dt.datetime]:
+    async def _update_solar_times_if_needed(
+        self, normal_cover
+    ) -> tuple[dt.datetime, dt.datetime]:
         """Update solar times if needed (first refresh or new day).
 
         Args:
@@ -531,6 +697,17 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     async def async_handle_cover_state_change(self, state: int):
         """Handle state change from assigned covers."""
         if self.manual_toggle and self.automatic_control:
+            # Check startup grace period FIRST to prevent false manual override
+            # detection during HA restart when covers respond slowly
+            if self._is_in_startup_grace_period():
+                entity_id = self.state_change_data.entity_id
+                self.logger.debug(
+                    "Position change for %s ignored (in startup grace period)",
+                    entity_id,
+                )
+                self.cover_state_change = False
+                return
+
             # Get the entity_id from state_change_data
             entity_id = self.state_change_data.entity_id
 
@@ -560,9 +737,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 if self.check_adaptive_time and not self.manager.is_cover_manual(cover):
                     self.target_call[cover] = state
                     self.logger.debug(
-                        "First refresh: Set target position %s for %s",
-                        state,
-                        cover
+                        "First refresh: Set target position %s for %s", state, cover
                     )
 
                     # Now check if we should actually send the command
@@ -591,8 +766,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                     await self.async_set_manual_position(cover, sunset_pos)
                 else:
                     self.logger.debug(
-                        "Timed refresh: delta too small for %s, skipping",
-                        cover
+                        "Timed refresh: delta too small for %s, skipping", cover
                     )
         else:
             self.logger.debug("Timed refresh but control toggle is off")
@@ -654,7 +828,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
             self.wait_for_target[entity] = True
             self.target_call[entity] = state
-            self._never_commanded.discard(entity)  # Remove from never-commanded tracking
+            self._start_grace_period(entity)
             self.logger.debug(
                 "Set wait for target %s and target call %s",
                 self.wait_for_target,
@@ -676,14 +850,19 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             if state >= self._open_close_threshold:
                 service = "open_cover"
                 self.target_call[entity] = 100
-                self._never_commanded.discard(entity)  # Remove from never-commanded tracking
+                self._never_commanded.discard(
+                    entity
+                )  # Remove from never-commanded tracking
             else:
                 service = "close_cover"
                 self.target_call[entity] = 0
-                self._never_commanded.discard(entity)  # Remove from never-commanded tracking
+                self._never_commanded.discard(
+                    entity
+                )  # Remove from never-commanded tracking
 
             service_data = {ATTR_ENTITY_ID: entity}
             self.wait_for_target[entity] = True
+            self._start_grace_period(entity)
 
             self.logger.debug(
                 "Using open/close control: state=%s, threshold=%s, service=%s",
@@ -711,7 +890,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             "service": service,
             "position": state if supports_position else self.target_call[entity],
             "calculated_position": state,
-            "threshold_used": self._open_close_threshold if not supports_position else None,
+            "threshold_used": self._open_close_threshold
+            if not supports_position
+            else None,
             "inverse_state_applied": self._inverse_state,
             "timestamp": dt.datetime.now().isoformat(),
             "covers_controlled": 1,
@@ -883,7 +1064,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                     "(entity: %s, position: %s, state: %s)",
                     entity,
                     position,
-                    state
+                    state,
                 )
                 return True  # Force repositioning on sun visibility transition
 
@@ -931,7 +1112,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self.logger.debug(
                     "Bypassing delta check: moving FROM special position %s to calculated position %s",
                     position,
-                    state
+                    state,
                 )
                 condition = True
 
@@ -1036,7 +1217,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             diagnostics["climate_control_method"] = self.control_method
 
             # Active temperature and temperature details
-            diagnostics["active_temperature"] = self.climate_data.get_current_temperature
+            diagnostics["active_temperature"] = (
+                self.climate_data.get_current_temperature
+            )
             diagnostics["temperature_details"] = {
                 "inside_temperature": self.climate_data.inside_temperature,
                 "outside_temperature": self.climate_data.outside_temperature,
@@ -1049,8 +1232,12 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 "is_winter": self.climate_data.is_winter,
                 "is_presence": self.climate_data.is_presence,
                 "is_sunny": self.climate_data.is_sunny,
-                "lux_active": self.climate_data.lux if self.climate_data._use_lux else None,
-                "irradiance_active": self.climate_data.irradiance if self.climate_data._use_irradiance else None,
+                "lux_active": self.climate_data.lux
+                if self.climate_data._use_lux
+                else None,
+                "irradiance_active": self.climate_data.irradiance
+                if self.climate_data._use_irradiance
+                else None,
             }
 
         return diagnostics
@@ -1240,13 +1427,15 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.logger.info(
                 "Time window state changed: %s → %s",
                 "active" if self._last_time_window_state else "inactive",
-                "active" if current_state else "inactive"
+                "active" if current_state else "inactive",
             )
             self._last_time_window_state = current_state
 
             # If we just left the time window, return covers to default position
             if not current_state and self._track_end_time:
-                self.logger.info("End time reached, returning covers to default position")
+                self.logger.info(
+                    "End time reached, returning covers to default position"
+                )
                 self.timed_refresh = True
                 await self.async_refresh()
 
@@ -1257,7 +1446,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         covers should immediately reposition regardless of delta checks.
         """
         # Need cover data to check sun validity
-        if not hasattr(self, 'normal_cover_state') or self.normal_cover_state is None:
+        if not hasattr(self, "normal_cover_state") or self.normal_cover_state is None:
             return False
 
         current_sun_valid = self.normal_cover_state.cover.direct_sun_valid
@@ -1320,7 +1509,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self._never_commanded.add(entity_id)
                 self.logger.debug(
                     "No command sent to %s yet, position verification will begin after first command",
-                    entity_id
+                    entity_id,
                 )
             return
 
@@ -1328,7 +1517,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         actual_position = self._get_current_position(entity_id)
 
         if actual_position is None:
-            self.logger.debug("Cannot verify position for %s: position unavailable", entity_id)
+            self.logger.debug(
+                "Cannot verify position for %s: position unavailable", entity_id
+            )
             return
 
         # Check if positions match within tolerance
@@ -1400,7 +1591,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.async_periodic_position_check,
             interval,
         )
-        self.logger.debug("Started periodic position verification (interval: %s)", interval)
+        self.logger.debug(
+            "Started periodic position verification (interval: %s)", interval
+        )
 
     def _stop_position_verification(self) -> None:
         """Stop periodic position verification."""
@@ -1409,11 +1602,24 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self._position_check_interval = None
             self.logger.debug("Stopped periodic position verification")
 
+    async def async_shutdown(self) -> None:
+        """Clean up resources on shutdown."""
+        # Cancel all grace period tasks
+        for entity_id in list(self._grace_period_tasks.keys()):
+            self._cancel_grace_period(entity_id)
+
+        # Stop position verification
+        self._stop_position_verification()
+
+        self.logger.debug("Coordinator shutdown complete")
+
 
 class AdaptiveCoverManager:
     """Track position changes."""
 
-    def __init__(self, hass: HomeAssistant, reset_duration: dict[str:int], logger) -> None:
+    def __init__(
+        self, hass: HomeAssistant, reset_duration: dict[str:int], logger
+    ) -> None:
         """Initialize the AdaptiveCoverManager."""
         self.hass = hass
         self.covers: set[str] = set()

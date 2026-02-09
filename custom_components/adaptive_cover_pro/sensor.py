@@ -14,6 +14,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_CLIMATE_MODE,
@@ -385,7 +386,168 @@ class AdaptiveCoverDiagnosticSensor(AdaptiveCoverDiagnosticSensorBase, SensorEnt
         """Return sensor value."""
         if self.data.diagnostics is None:
             return None
-        return self.data.diagnostics.get(self._diagnostic_key)
+        diagnostics = self.data.diagnostics
+        return diagnostics.get(self._diagnostic_key)
+
+    def _build_azimuth_attributes(self) -> dict[str, Any] | None:
+        """Build attributes for sun azimuth sensor."""
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
+        config = diagnostics.get("configuration", {})
+        window_azi = config.get("azimuth")
+        fov_left = config.get("fov_left")
+        fov_right = config.get("fov_right")
+
+        if window_azi is None or fov_left is None or fov_right is None:
+            return None
+
+        azi_min = (window_azi - fov_left + 360) % 360
+        azi_max = (window_azi + fov_right + 360) % 360
+
+        return {
+            "window_azimuth": window_azi,
+            "fov_left": fov_left,
+            "fov_right": fov_right,
+            "azimuth_min": azi_min,
+            "azimuth_max": azi_max,
+            "in_fov": self._check_azimuth_in_fov(azi_min, azi_max),
+        }
+
+    def _check_azimuth_in_fov(self, azi_min: float, azi_max: float) -> bool:
+        """Check if current sun azimuth is within field of view."""
+        if self.data.diagnostics is None:
+            return False
+        diagnostics = self.data.diagnostics
+        sun_azimuth = diagnostics.get("sun_azimuth")
+        if sun_azimuth is None:
+            return False
+
+        # Handle wraparound (FOV crosses 0/360 boundary)
+        if azi_min <= azi_max:
+            return azi_min <= sun_azimuth <= azi_max
+        else:
+            return sun_azimuth >= azi_min or sun_azimuth <= azi_max
+
+    def _build_elevation_attributes(self) -> dict[str, Any] | None:
+        """Build attributes for sun elevation sensor."""
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
+        config = diagnostics.get("configuration", {})
+        min_elev = config.get("min_elevation")
+        max_elev = config.get("max_elevation")
+
+        attrs = {
+            "valid_elevation": diagnostics.get("sun_validity", {}).get(
+                "valid_elevation"
+            ),
+        }
+
+        # Only include min/max if configured
+        if min_elev is not None:
+            attrs["min_elevation"] = min_elev
+        if max_elev is not None:
+            attrs["max_elevation"] = max_elev
+
+        # Include blind spot if enabled
+        if config.get("enable_blind_spot", False):
+            blind_spot_elev = config.get("blind_spot_elevation")
+            if blind_spot_elev is not None:
+                attrs["blind_spot_elevation"] = blind_spot_elev
+                attrs["in_blind_spot"] = diagnostics.get("sun_validity", {}).get(
+                    "in_blind_spot", False
+                )
+
+        return attrs
+
+    def _build_gamma_attributes(self) -> dict[str, Any] | None:
+        """Build attributes for gamma sensor."""
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
+        gamma = diagnostics.get("gamma")
+        if gamma is None:
+            return None
+
+        # Gamma interpretation
+        abs_gamma = abs(gamma)
+        if abs_gamma < 10:
+            interpretation = "nearly perpendicular"
+        elif abs_gamma < 45:
+            interpretation = "oblique angle"
+        elif abs_gamma < 80:
+            interpretation = "steep angle"
+        else:
+            interpretation = "nearly parallel"
+
+        attrs = {
+            "interpretation": interpretation,
+            "absolute_angle": abs_gamma,
+            "direction": "left" if gamma < 0 else "right" if gamma > 0 else "center",
+        }
+
+        # Include blind spot range if configured
+        config = diagnostics.get("configuration", {})
+        if config.get("enable_blind_spot", False):
+            blind_spot_left = config.get("blind_spot_left")
+            blind_spot_right = config.get("blind_spot_right")
+            fov_left = config.get("fov_left")
+            if (
+                blind_spot_left is not None
+                and blind_spot_right is not None
+                and fov_left is not None
+            ):
+                left_edge = fov_left - blind_spot_left
+                right_edge = fov_left - blind_spot_right
+                attrs["blind_spot_range"] = [right_edge, left_edge]
+
+        return attrs
+
+    def _build_calculated_position_attributes(self) -> dict[str, Any] | None:
+        """Build attributes for calculated position sensor."""
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
+        config = diagnostics.get("configuration", {})
+        calculated = diagnostics.get("calculated_position")
+        if calculated is None:
+            return None
+
+        attrs = {
+            "final_position": self.data.states.get("state"),
+            "direct_sun_valid": self.data.states.get("sun_motion"),
+        }
+
+        # Show applied limits if they affected the result
+        min_pos = config.get("min_position")
+        max_pos = config.get("max_position")
+        enable_min = config.get("enable_min_position", False)
+        enable_max = config.get("enable_max_position", False)
+
+        if min_pos is not None and enable_min and calculated < min_pos:
+            attrs["min_limit_applied"] = min_pos
+            attrs["limited_by"] = "min_position"
+
+        if max_pos is not None and enable_max and calculated > max_pos:
+            attrs["max_limit_applied"] = max_pos
+            attrs["limited_by"] = "max_position"
+
+        # Show if inverse state is applied
+        if config.get("inverse_state", False):
+            attrs["inverse_state_enabled"] = True
+
+        # Show if interpolation is applied
+        if config.get("interpolation", False):
+            attrs["interpolation_enabled"] = True
+
+        # Show climate mode position if different
+        if diagnostics.get("calculated_position_climate") is not None:
+            climate_pos = diagnostics.get("calculated_position_climate")
+            if climate_pos != calculated:
+                attrs["climate_position"] = climate_pos
+
+        return attrs
 
     def _build_azimuth_attributes(self) -> dict[str, Any] | None:
         """Build attributes for sun azimuth sensor."""
@@ -537,6 +699,7 @@ class AdaptiveCoverDiagnosticSensor(AdaptiveCoverDiagnosticSensorBase, SensorEnt
         """Return additional state attributes for complex diagnostic data."""
         if self.data.diagnostics is None:
             return None
+        diagnostics = self.data.diagnostics
 
         # Route to sensor-specific attribute builders
         if self._diagnostic_key == "sun_azimuth":
@@ -550,7 +713,7 @@ class AdaptiveCoverDiagnosticSensor(AdaptiveCoverDiagnosticSensorBase, SensorEnt
 
         # For other sensors, check if dict data exists (time_window, sun_validity)
         if self._diagnostic_key in ["time_window", "sun_validity"]:
-            return self.data.diagnostics.get(self._diagnostic_key)
+            return diagnostics.get(self._diagnostic_key)
 
         return None
 
@@ -588,7 +751,8 @@ class AdaptiveCoverDiagnosticEnumSensor(
         """Return sensor value."""
         if self.data.diagnostics is None:
             return None
-        return self.data.diagnostics.get(self._diagnostic_key)
+        diagnostics = self.data.diagnostics
+        return diagnostics.get(self._diagnostic_key)
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
@@ -605,21 +769,24 @@ class AdaptiveCoverDiagnosticEnumSensor(
 
     def _build_control_status_attributes(self) -> dict[str, Any] | None:
         """Build attributes for control status sensor."""
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
         attrs = {}
 
         # Always show automatic control status
         attrs["automatic_control_enabled"] = self.coordinator.automatic_control
 
-        control_status = self.data.diagnostics.get("control_status")
+        control_status = diagnostics.get("control_status")
 
         # Add context-specific attributes based on status
         if control_status == "outside_time_window":
-            time_window = self.data.diagnostics.get("time_window", {})
+            time_window = diagnostics.get("time_window", {})
             attrs["after_start_time"] = time_window.get("after_start_time")
             attrs["before_end_time"] = time_window.get("before_end_time")
 
         elif control_status == "sun_not_visible":
-            sun_validity = self.data.diagnostics.get("sun_validity", {})
+            sun_validity = diagnostics.get("sun_validity", {})
             attrs["valid_elevation"] = sun_validity.get("valid_elevation")
             attrs["in_blind_spot"] = sun_validity.get("in_blind_spot")
 
@@ -671,10 +838,11 @@ class AdaptiveCoverAdvancedDiagnosticSensor(AdaptiveCoverDiagnosticSensor):
         """Return additional state attributes."""
         if self.data.diagnostics is None:
             return None
+        diagnostics = self.data.diagnostics
 
         # For temperature sensor, add temperature details
         if self._diagnostic_key == "active_temperature":
-            return self.data.diagnostics.get("temperature_details")
+            return diagnostics.get("temperature_details")
 
         return None
 
@@ -689,8 +857,9 @@ class AdaptiveCoverAdvancedDiagnosticEnumSensor(AdaptiveCoverDiagnosticEnumSenso
         """Return computed state from dict data."""
         if self.data.diagnostics is None:
             return None
+        diagnostics = self.data.diagnostics
 
-        data = self.data.diagnostics.get(self._diagnostic_key)
+        data = diagnostics.get(self._diagnostic_key)
         if data is None:
             return None
 
@@ -719,7 +888,8 @@ class AdaptiveCoverAdvancedDiagnosticEnumSensor(AdaptiveCoverDiagnosticEnumSenso
         """Return dict data as attributes."""
         if self.data.diagnostics is None:
             return None
-        return self.data.diagnostics.get(self._diagnostic_key)
+        diagnostics = self.data.diagnostics
+        return diagnostics.get(self._diagnostic_key)
 
 
 class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
@@ -757,8 +927,9 @@ class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
         """Return the state of the sensor."""
         if not self.data or not self.data.diagnostics:
             return None
+        diagnostics = self.data.diagnostics
 
-        action = self.data.diagnostics.get("last_cover_action")
+        action = diagnostics.get("last_cover_action")
         if not action or not action.get("entity_id"):
             return "No action recorded"
 
@@ -770,8 +941,6 @@ class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
         # Parse and format timestamp to be more readable
         if timestamp_str:
             try:
-                from homeassistant import util as dt_util
-
                 ts = dt_util.parse_datetime(timestamp_str)
                 if ts:
                     time_str = ts.strftime("%H:%M:%S")
@@ -786,8 +955,9 @@ class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
         """Return additional attributes."""
         if not self.data or not self.data.diagnostics:
             return None
+        diagnostics = self.data.diagnostics
 
-        action = self.data.diagnostics.get("last_cover_action")
+        action = diagnostics.get("last_cover_action")
         if not action or not action.get("entity_id"):
             return None
 
