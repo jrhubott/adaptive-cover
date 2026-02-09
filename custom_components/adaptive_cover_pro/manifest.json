@@ -16,7 +16,6 @@
   "documentation": "https://github.com/jrhubott/adaptive-cover",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/jrhubott/adaptive-cover/issues",
-  "minimum_ha_version": "2025.11.0",
   "requirements": [
     "astral",
     "pandas"
