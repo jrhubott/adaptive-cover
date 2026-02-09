@@ -653,6 +653,19 @@ gh release view v2.6.8
 - Project structure changes
 - Debugging tools/techniques
 
+### VSCODE_TESTING_GUIDE.md Updates
+
+**CRITICAL:** Always update docs/VSCODE_TESTING_GUIDE.md when making changes that affect the VS Code testing workflow.
+
+**When to Update:**
+- New VS Code debug configurations
+- Changes to launch.json or tasks.json
+- New testing keyboard shortcuts
+- Test runner configuration changes
+- VS Code extension recommendations
+- Testing UI workflow changes
+- Debugging tips and techniques for VS Code
+
 ### Features Planned Section (README.md)
 
 Check the "Features Planned" section in README.md when asked to add new functionality:
