@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 import pytz
-from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
+from homeassistant.components.cover.const import DOMAIN as COVER_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -37,8 +37,6 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.template import state_attr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .config_context_adapter import ConfigContextAdapter
-
 from .calculation import (
     AdaptiveHorizontalCover,
     AdaptiveTiltCover,
@@ -47,10 +45,12 @@ from .calculation import (
     ClimateCoverState,
     NormalCoverState,
 )
+from .config_context_adapter import ConfigContextAdapter
 from .const import (
     _LOGGER,
     ATTR_POSITION,
     ATTR_TILT_POSITION,
+    COMMAND_GRACE_PERIOD_SECONDS,
     CONF_AWNING_ANGLE,
     CONF_AZIMUTH,
     CONF_BLIND_SPOT_ELEVATION,
@@ -61,7 +61,6 @@ from .const import (
     CONF_DELTA_POSITION,
     CONF_DELTA_TIME,
     CONF_DISTANCE,
-    CONF_WINDOW_DEPTH,
     CONF_ENABLE_BLIND_SPOT,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_MAX_POSITION,
@@ -91,6 +90,7 @@ from .const import (
     CONF_MAX_POSITION,
     CONF_MIN_ELEVATION,
     CONF_MIN_POSITION,
+    CONF_OPEN_CLOSE_THRESHOLD,
     CONF_OUTSIDE_THRESHOLD,
     CONF_OUTSIDETEMP_ENTITY,
     CONF_PRESENCE_ENTITY,
@@ -109,22 +109,21 @@ from .const import (
     CONF_TRANSPARENT_BLIND,
     CONF_WEATHER_ENTITY,
     CONF_WEATHER_STATE,
-    CONF_OPEN_CLOSE_THRESHOLD,
+    CONF_WINDOW_DEPTH,
     DOMAIN,
-    ControlStatus,
     LOGGER,
     MAX_POSITION_RETRIES,
     POSITION_CHECK_INTERVAL_MINUTES,
     POSITION_TOLERANCE_PERCENT,
-    COMMAND_GRACE_PERIOD_SECONDS,
     STARTUP_GRACE_PERIOD_SECONDS,
+    ControlStatus,
 )
 from .helpers import (
+    check_cover_features,
     get_datetime_from_str,
     get_last_updated,
-    get_safe_state,
-    check_cover_features,
     get_open_close_state,
+    get_safe_state,
 )
 
 
@@ -196,7 +195,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self.control_method = "intermediate"
         self.state_change_data: StateChangedData | None = None
         self.raw_calculated_position = 0  # Store raw position for diagnostics
-        self.manager = AdaptiveCoverManager(self.hass, self.manual_duration, self.logger)
+        self.manager = AdaptiveCoverManager(
+            self.hass, self.manual_duration, self.logger
+        )
         self.wait_for_target = {}
         self.target_call = {}
         self.ignore_intermediate_states = self.config_entry.options.get(
@@ -214,7 +215,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         self._scheduled_time = dt.datetime.now()
 
         self._cached_options = None
-        self._open_close_threshold = self.config_entry.options.get(CONF_OPEN_CLOSE_THRESHOLD, 50)
+        self._open_close_threshold = self.config_entry.options.get(
+            CONF_OPEN_CLOSE_THRESHOLD, 50
+        )
 
         # Track last cover action for diagnostic sensor
         self.last_cover_action: dict[str, Any] = {
@@ -231,7 +234,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         # Position verification tracking
         self._position_check_interval = None  # async_track_time_interval listener
         self._retry_counts: dict[str, int] = {}  # entity_id → retry count
-        self._last_verification: dict[str, dt.datetime] = {}  # entity_id → last check time
+        self._last_verification: dict[
+            str, dt.datetime
+        ] = {}  # entity_id → last check time
         self._check_interval_minutes = POSITION_CHECK_INTERVAL_MINUTES
         self._position_tolerance = POSITION_TOLERANCE_PERCENT
         self._max_retries = MAX_POSITION_RETRIES
@@ -487,7 +492,10 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         """
         # Cancel any existing grace period task
-        if self._startup_grace_period_task and not self._startup_grace_period_task.done():
+        if (
+            self._startup_grace_period_task
+            and not self._startup_grace_period_task.done()
+        ):
             self._startup_grace_period_task.cancel()
 
         # Record startup timestamp
@@ -576,7 +584,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         return self.state
 
-    async def _update_solar_times_if_needed(self, normal_cover) -> tuple[dt.datetime, dt.datetime]:
+    async def _update_solar_times_if_needed(
+        self, normal_cover
+    ) -> tuple[dt.datetime, dt.datetime]:
         """Update solar times if needed (first refresh or new day).
 
         Args:
@@ -722,9 +732,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 if self.check_adaptive_time and not self.manager.is_cover_manual(cover):
                     self.target_call[cover] = state
                     self.logger.debug(
-                        "First refresh: Set target position %s for %s",
-                        state,
-                        cover
+                        "First refresh: Set target position %s for %s", state, cover
                     )
 
                     # Now check if we should actually send the command
@@ -753,8 +761,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                     await self.async_set_manual_position(cover, sunset_pos)
                 else:
                     self.logger.debug(
-                        "Timed refresh: delta too small for %s, skipping",
-                        cover
+                        "Timed refresh: delta too small for %s, skipping", cover
                     )
         else:
             self.logger.debug("Timed refresh but control toggle is off")
@@ -838,11 +845,15 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             if state >= self._open_close_threshold:
                 service = "open_cover"
                 self.target_call[entity] = 100
-                self._never_commanded.discard(entity)  # Remove from never-commanded tracking
+                self._never_commanded.discard(
+                    entity
+                )  # Remove from never-commanded tracking
             else:
                 service = "close_cover"
                 self.target_call[entity] = 0
-                self._never_commanded.discard(entity)  # Remove from never-commanded tracking
+                self._never_commanded.discard(
+                    entity
+                )  # Remove from never-commanded tracking
 
             service_data = {ATTR_ENTITY_ID: entity}
             self.wait_for_target[entity] = True
@@ -874,7 +885,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             "service": service,
             "position": state if supports_position else self.target_call[entity],
             "calculated_position": state,
-            "threshold_used": self._open_close_threshold if not supports_position else None,
+            "threshold_used": self._open_close_threshold
+            if not supports_position
+            else None,
             "inverse_state_applied": self._inverse_state,
             "timestamp": dt.datetime.now().isoformat(),
             "covers_controlled": 1,
@@ -1046,7 +1059,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                     "(entity: %s, position: %s, state: %s)",
                     entity,
                     position,
-                    state
+                    state,
                 )
                 return True  # Force repositioning on sun visibility transition
 
@@ -1094,7 +1107,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self.logger.debug(
                     "Bypassing delta check: moving FROM special position %s to calculated position %s",
                     position,
-                    state
+                    state,
                 )
                 condition = True
 
@@ -1191,7 +1204,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         return [
             options.get(CONF_DISTANCE),
             options.get(CONF_HEIGHT_WIN),
-            options.get(CONF_WINDOW_DEPTH, 0.0),  # Default 0.0 for backward compatibility
+            options.get(
+                CONF_WINDOW_DEPTH, 0.0
+            ),  # Default 0.0 for backward compatibility
         ]
 
     def horizontal_data(self, options):
@@ -1223,7 +1238,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
         return [
             distance / 100,  # Convert cm to meters
-            depth / 100,     # Convert cm to meters
+            depth / 100,  # Convert cm to meters
             options.get(CONF_TILT_MODE),
         ]
 
@@ -1287,7 +1302,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             diagnostics["climate_control_method"] = self.control_method
 
             # Active temperature and temperature details
-            diagnostics["active_temperature"] = self.climate_data.get_current_temperature
+            diagnostics["active_temperature"] = (
+                self.climate_data.get_current_temperature
+            )
             diagnostics["temperature_details"] = {
                 "inside_temperature": self.climate_data.inside_temperature,
                 "outside_temperature": self.climate_data.outside_temperature,
@@ -1300,8 +1317,12 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 "is_winter": self.climate_data.is_winter,
                 "is_presence": self.climate_data.is_presence,
                 "is_sunny": self.climate_data.is_sunny,
-                "lux_active": self.climate_data.lux if self.climate_data._use_lux else None,
-                "irradiance_active": self.climate_data.irradiance if self.climate_data._use_irradiance else None,
+                "lux_active": self.climate_data.lux
+                if self.climate_data._use_lux
+                else None,
+                "irradiance_active": self.climate_data.irradiance
+                if self.climate_data._use_irradiance
+                else None,
             }
 
         return diagnostics
@@ -1491,13 +1512,15 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.logger.info(
                 "Time window state changed: %s → %s",
                 "active" if self._last_time_window_state else "inactive",
-                "active" if current_state else "inactive"
+                "active" if current_state else "inactive",
             )
             self._last_time_window_state = current_state
 
             # If we just left the time window, return covers to default position
             if not current_state and self._track_end_time:
-                self.logger.info("End time reached, returning covers to default position")
+                self.logger.info(
+                    "End time reached, returning covers to default position"
+                )
                 self.timed_refresh = True
                 await self.async_refresh()
 
@@ -1508,7 +1531,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         covers should immediately reposition regardless of delta checks.
         """
         # Need cover data to check sun validity
-        if not hasattr(self, 'normal_cover_state') or self.normal_cover_state is None:
+        if not hasattr(self, "normal_cover_state") or self.normal_cover_state is None:
             return False
 
         current_sun_valid = self.normal_cover_state.cover.direct_sun_valid
@@ -1571,7 +1594,7 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 self._never_commanded.add(entity_id)
                 self.logger.debug(
                     "No command sent to %s yet, position verification will begin after first command",
-                    entity_id
+                    entity_id,
                 )
             return
 
@@ -1579,7 +1602,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         actual_position = self._get_current_position(entity_id)
 
         if actual_position is None:
-            self.logger.debug("Cannot verify position for %s: position unavailable", entity_id)
+            self.logger.debug(
+                "Cannot verify position for %s: position unavailable", entity_id
+            )
             return
 
         # Check if positions match within tolerance
@@ -1651,7 +1676,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
             self.async_periodic_position_check,
             interval,
         )
-        self.logger.debug("Started periodic position verification (interval: %s)", interval)
+        self.logger.debug(
+            "Started periodic position verification (interval: %s)", interval
+        )
 
     def _stop_position_verification(self) -> None:
         """Stop periodic position verification."""
@@ -1675,7 +1702,9 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 class AdaptiveCoverManager:
     """Track position changes."""
 
-    def __init__(self, hass: HomeAssistant, reset_duration: dict[str:int], logger) -> None:
+    def __init__(
+        self, hass: HomeAssistant, reset_duration: dict[str:int], logger
+    ) -> None:
         """Initialize the AdaptiveCoverManager."""
         self.hass = hass
         self.covers: set[str] = set()

@@ -11,12 +11,12 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceEntryType
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_CLIMATE_MODE,
@@ -498,11 +498,15 @@ class AdaptiveCoverDiagnosticSensor(
         """Return sensor value."""
         if self.data.diagnostics is None:
             return None
-        return self.data.diagnostics.get(self._diagnostic_key)
+        diagnostics = self.data.diagnostics
+        return diagnostics.get(self._diagnostic_key)
 
     def _build_azimuth_attributes(self) -> dict[str, Any] | None:
         """Build attributes for sun azimuth sensor."""
-        config = self.data.diagnostics.get("configuration", {})
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
+        config = diagnostics.get("configuration", {})
         window_azi = config.get("azimuth")
         fov_left = config.get("fov_left")
         fov_right = config.get("fov_right")
@@ -524,7 +528,10 @@ class AdaptiveCoverDiagnosticSensor(
 
     def _check_azimuth_in_fov(self, azi_min: float, azi_max: float) -> bool:
         """Check if current sun azimuth is within field of view."""
-        sun_azimuth = self.data.diagnostics.get("sun_azimuth")
+        if self.data.diagnostics is None:
+            return False
+        diagnostics = self.data.diagnostics
+        sun_azimuth = diagnostics.get("sun_azimuth")
         if sun_azimuth is None:
             return False
 
@@ -536,12 +543,17 @@ class AdaptiveCoverDiagnosticSensor(
 
     def _build_elevation_attributes(self) -> dict[str, Any] | None:
         """Build attributes for sun elevation sensor."""
-        config = self.data.diagnostics.get("configuration", {})
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
+        config = diagnostics.get("configuration", {})
         min_elev = config.get("min_elevation")
         max_elev = config.get("max_elevation")
 
         attrs = {
-            "valid_elevation": self.data.diagnostics.get("sun_validity", {}).get("valid_elevation"),
+            "valid_elevation": diagnostics.get("sun_validity", {}).get(
+                "valid_elevation"
+            ),
         }
 
         # Only include min/max if configured
@@ -555,13 +567,18 @@ class AdaptiveCoverDiagnosticSensor(
             blind_spot_elev = config.get("blind_spot_elevation")
             if blind_spot_elev is not None:
                 attrs["blind_spot_elevation"] = blind_spot_elev
-                attrs["in_blind_spot"] = self.data.diagnostics.get("sun_validity", {}).get("in_blind_spot", False)
+                attrs["in_blind_spot"] = diagnostics.get("sun_validity", {}).get(
+                    "in_blind_spot", False
+                )
 
         return attrs
 
     def _build_gamma_attributes(self) -> dict[str, Any] | None:
         """Build attributes for gamma sensor."""
-        gamma = self.data.diagnostics.get("gamma")
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
+        gamma = diagnostics.get("gamma")
         if gamma is None:
             return None
 
@@ -583,12 +600,16 @@ class AdaptiveCoverDiagnosticSensor(
         }
 
         # Include blind spot range if configured
-        config = self.data.diagnostics.get("configuration", {})
+        config = diagnostics.get("configuration", {})
         if config.get("enable_blind_spot", False):
             blind_spot_left = config.get("blind_spot_left")
             blind_spot_right = config.get("blind_spot_right")
             fov_left = config.get("fov_left")
-            if blind_spot_left is not None and blind_spot_right is not None and fov_left is not None:
+            if (
+                blind_spot_left is not None
+                and blind_spot_right is not None
+                and fov_left is not None
+            ):
                 left_edge = fov_left - blind_spot_left
                 right_edge = fov_left - blind_spot_right
                 attrs["blind_spot_range"] = [right_edge, left_edge]
@@ -597,8 +618,11 @@ class AdaptiveCoverDiagnosticSensor(
 
     def _build_calculated_position_attributes(self) -> dict[str, Any] | None:
         """Build attributes for calculated position sensor."""
-        config = self.data.diagnostics.get("configuration", {})
-        calculated = self.data.diagnostics.get("calculated_position")
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
+        config = diagnostics.get("configuration", {})
+        calculated = diagnostics.get("calculated_position")
         if calculated is None:
             return None
 
@@ -630,8 +654,8 @@ class AdaptiveCoverDiagnosticSensor(
             attrs["interpolation_enabled"] = True
 
         # Show climate mode position if different
-        if self.data.diagnostics.get("calculated_position_climate") is not None:
-            climate_pos = self.data.diagnostics.get("calculated_position_climate")
+        if diagnostics.get("calculated_position_climate") is not None:
+            climate_pos = diagnostics.get("calculated_position_climate")
             if climate_pos != calculated:
                 attrs["climate_position"] = climate_pos
 
@@ -651,6 +675,7 @@ class AdaptiveCoverDiagnosticSensor(
         """Return additional state attributes for complex diagnostic data."""
         if self.data.diagnostics is None:
             return None
+        diagnostics = self.data.diagnostics
 
         # Route to sensor-specific attribute builders
         if self._diagnostic_key == "sun_azimuth":
@@ -664,7 +689,7 @@ class AdaptiveCoverDiagnosticSensor(
 
         # For other sensors, check if dict data exists (time_window, sun_validity)
         if self._diagnostic_key in ["time_window", "sun_validity"]:
-            return self.data.diagnostics.get(self._diagnostic_key)
+            return diagnostics.get(self._diagnostic_key)
 
         return None
 
@@ -724,7 +749,8 @@ class AdaptiveCoverDiagnosticEnumSensor(
         """Return sensor value."""
         if self.data.diagnostics is None:
             return None
-        return self.data.diagnostics.get(self._diagnostic_key)
+        diagnostics = self.data.diagnostics
+        return diagnostics.get(self._diagnostic_key)
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
@@ -741,28 +767,33 @@ class AdaptiveCoverDiagnosticEnumSensor(
 
     def _build_control_status_attributes(self) -> dict[str, Any] | None:
         """Build attributes for control status sensor."""
+        if self.data.diagnostics is None:
+            return None
+        diagnostics = self.data.diagnostics
         attrs = {}
 
         # Always show automatic control status
         attrs["automatic_control_enabled"] = self.coordinator.automatic_control
 
-        control_status = self.data.diagnostics.get("control_status")
+        control_status = diagnostics.get("control_status")
 
         # Add context-specific attributes based on status
         if control_status == "outside_time_window":
-            time_window = self.data.diagnostics.get("time_window", {})
+            time_window = diagnostics.get("time_window", {})
             attrs["after_start_time"] = time_window.get("after_start_time")
             attrs["before_end_time"] = time_window.get("before_end_time")
 
         elif control_status == "sun_not_visible":
-            sun_validity = self.data.diagnostics.get("sun_validity", {})
+            sun_validity = diagnostics.get("sun_validity", {})
             attrs["valid_elevation"] = sun_validity.get("valid_elevation")
             attrs["in_blind_spot"] = sun_validity.get("in_blind_spot")
 
         elif control_status == "manual_override":
             attrs["manual_covers"] = self.data.states.get("manual_list", [])
 
-        return attrs if len(attrs) > 1 else None  # Return None if only automatic_control_enabled
+        return (
+            attrs if len(attrs) > 1 else None
+        )  # Return None if only automatic_control_enabled
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -795,8 +826,16 @@ class AdaptiveCoverAdvancedDiagnosticSensor(AdaptiveCoverDiagnosticSensor):
     ) -> None:
         """Initialize advanced diagnostic sensor."""
         super().__init__(
-            unique_id, hass, config_entry, name, coordinator,
-            sensor_name, diagnostic_key, unit, icon, state_class
+            unique_id,
+            hass,
+            config_entry,
+            name,
+            coordinator,
+            sensor_name,
+            diagnostic_key,
+            unit,
+            icon,
+            state_class,
         )
         if device_class:
             self._attr_device_class = device_class
@@ -806,10 +845,11 @@ class AdaptiveCoverAdvancedDiagnosticSensor(AdaptiveCoverDiagnosticSensor):
         """Return additional state attributes."""
         if self.data.diagnostics is None:
             return None
+        diagnostics = self.data.diagnostics
 
         # For temperature sensor, add temperature details
         if self._diagnostic_key == "active_temperature":
-            return self.data.diagnostics.get("temperature_details")
+            return diagnostics.get("temperature_details")
 
         return None
 
@@ -824,8 +864,9 @@ class AdaptiveCoverAdvancedDiagnosticEnumSensor(AdaptiveCoverDiagnosticEnumSenso
         """Return computed state from dict data."""
         if self.data.diagnostics is None:
             return None
+        diagnostics = self.data.diagnostics
 
-        data = self.data.diagnostics.get(self._diagnostic_key)
+        data = diagnostics.get(self._diagnostic_key)
         if data is None:
             return None
 
@@ -854,7 +895,8 @@ class AdaptiveCoverAdvancedDiagnosticEnumSensor(AdaptiveCoverDiagnosticEnumSenso
         """Return dict data as attributes."""
         if self.data.diagnostics is None:
             return None
-        return self.data.diagnostics.get(self._diagnostic_key)
+        diagnostics = self.data.diagnostics
+        return diagnostics.get(self._diagnostic_key)
 
 
 class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
@@ -892,8 +934,9 @@ class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
         """Return the state of the sensor."""
         if not self.data or not self.data.diagnostics:
             return None
+        diagnostics = self.data.diagnostics
 
-        action = self.data.diagnostics.get("last_cover_action")
+        action = diagnostics.get("last_cover_action")
         if not action or not action.get("entity_id"):
             return "No action recorded"
 
@@ -905,8 +948,6 @@ class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
         # Parse and format timestamp to be more readable
         if timestamp_str:
             try:
-                from homeassistant import util as dt_util
-
                 ts = dt_util.parse_datetime(timestamp_str)
                 if ts:
                     time_str = ts.strftime("%H:%M:%S")
@@ -921,8 +962,9 @@ class AdaptiveCoverLastActionSensor(AdaptiveCoverAdvancedDiagnosticSensor):
         """Return additional attributes."""
         if not self.data or not self.data.diagnostics:
             return None
+        diagnostics = self.data.diagnostics
 
-        action = self.data.diagnostics.get("last_cover_action")
+        action = diagnostics.get("last_cover_action")
         if not action or not action.get("entity_id"):
             return None
 
