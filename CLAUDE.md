@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**For comprehensive developer documentation, see [DEVELOPMENT.md](DEVELOPMENT.md)** - This file contains instructions for Claude Code specifically, while DEVELOPMENT.md is the human-readable developer guide.
+**For comprehensive developer documentation, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - This file contains instructions for Claude Code specifically, while docs/DEVELOPMENT.md is the human-readable developer guide.
 
 ## Project Overview
 
@@ -387,7 +387,7 @@ This applies to ALL commits (regular commits, merge commits, etc.) and release n
 
 ## Testing
 
-**For comprehensive testing documentation, see [UNIT_TESTS.md](UNIT_TESTS.md)**
+**For comprehensive testing documentation, see [docs/UNIT_TESTS.md](docs/UNIT_TESTS.md)**
 
 ### Running Tests
 
@@ -642,7 +642,7 @@ gh release view v2.6.8
 
 ### DEVELOPMENT.md Updates
 
-**CRITICAL:** Always update DEVELOPMENT.md when making changes that affect the development process.
+**CRITICAL:** Always update docs/DEVELOPMENT.md when making changes that affect the development process.
 
 **When to Update:**
 - New development scripts
@@ -889,8 +889,12 @@ adaptive-cover/
 ├── release_notes/               # Historical release notes
 │   ├── README.md                # Release notes documentation
 │   └── vX.Y.Z.md                # Individual release notes (versioned)
-├── DEVELOPMENT.md               # Developer documentation
-├── UNIT_TESTS.md                # Unit test documentation
+├── docs/                        # Documentation directory
+│   ├── ARCHITECTURE.md          # Architecture documentation
+│   ├── CONTRIBUTING.md          # Contributing guidelines
+│   ├── DEVELOPMENT.md           # Developer documentation
+│   ├── UNIT_TESTS.md            # Unit test documentation
+│   └── VSCODE_TESTING_GUIDE.md  # VS Code testing guide
 ├── CLAUDE.md                    # Claude Code instructions (this file)
 ├── README.md                    # User documentation
 └── pyproject.toml               # Python project configuration

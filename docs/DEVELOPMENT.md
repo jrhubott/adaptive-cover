@@ -113,7 +113,12 @@ adaptive-cover/
 │   └── test_env.ipynb          # Algorithm testing/visualization
 ├── .github/workflows/           # GitHub Actions
 │   └── publish-release.yml      # Automated release workflow
-├── DEVELOPMENT.md              # This file
+├── docs/                        # Documentation directory
+│   ├── ARCHITECTURE.md          # Architecture documentation
+│   ├── CONTRIBUTING.md          # Contributing guidelines
+│   ├── DEVELOPMENT.md           # This file
+│   ├── UNIT_TESTS.md            # Unit test documentation
+│   └── VSCODE_TESTING_GUIDE.md  # VS Code testing guide
 ├── CLAUDE.md                   # Instructions for Claude Code
 ├── README.md                   # User documentation
 └── pyproject.toml              # Python project configuration

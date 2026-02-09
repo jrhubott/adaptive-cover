@@ -21,7 +21,7 @@ This fork includes enhancements and modifications, but the core functionality an
 
 ## For Developers
 
-If you're interested in contributing to this project, please see the **[Development Guide (DEVELOPMENT.md)](DEVELOPMENT.md)** for comprehensive documentation on:
+If you're interested in contributing to this project, please see the **[Development Guide (docs/DEVELOPMENT.md)](docs/DEVELOPMENT.md)** for comprehensive documentation on:
 - Setting up your development environment
 - Project structure and architecture
 - Development workflow and scripts
