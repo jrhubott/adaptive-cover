@@ -8,10 +8,8 @@ from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_ON
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_CLIMATE_MODE,
@@ -24,6 +22,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import AdaptiveDataUpdateCoordinator
+from .entity_base import AdaptiveCoverBaseEntity
 
 
 async def async_setup_entry(
@@ -37,60 +36,67 @@ async def async_setup_entry(
     ]
 
     manual_switch = AdaptiveCoverSwitch(
-        config_entry,
         config_entry.entry_id,
+        hass,
+        config_entry,
+        coordinator,
         "Manual Override",
         True,
         "manual_toggle",
-        coordinator,
     )
     control_switch = AdaptiveCoverSwitch(
-        config_entry,
         config_entry.entry_id,
+        hass,
+        config_entry,
+        coordinator,
         "Automatic Control",
         True,
         "automatic_control",
-        coordinator,
     )
     climate_switch = AdaptiveCoverSwitch(
-        config_entry,
         config_entry.entry_id,
+        hass,
+        config_entry,
+        coordinator,
         "Climate Mode",
         True,
         "switch_mode",
-        coordinator,
     )
     temp_switch = AdaptiveCoverSwitch(
-        config_entry,
         config_entry.entry_id,
+        hass,
+        config_entry,
+        coordinator,
         "Outside Temperature",
         False,
         "temp_toggle",
-        coordinator,
     )
     lux_switch = AdaptiveCoverSwitch(
-        config_entry,
         config_entry.entry_id,
+        hass,
+        config_entry,
+        coordinator,
         "Lux",
         True,
         "lux_toggle",
-        coordinator,
     )
     irradiance_switch = AdaptiveCoverSwitch(
-        config_entry,
         config_entry.entry_id,
+        hass,
+        config_entry,
+        coordinator,
         "Irradiance",
         True,
         "irradiance_toggle",
-        coordinator,
     )
     return_default_switch = AdaptiveCoverSwitch(
-        config_entry,
         config_entry.entry_id,
+        hass,
+        config_entry,
+        coordinator,
         "Return to default when disabled",
         False,
         "return_to_default_toggle",
-        coordinator,
     )
 
     climate_mode = config_entry.options.get(CONF_CLIMATE_MODE)
@@ -119,45 +125,29 @@ async def async_setup_entry(
     async_add_entities(switches)
 
 
-class AdaptiveCoverSwitch(
-    CoordinatorEntity[AdaptiveDataUpdateCoordinator], SwitchEntity, RestoreEntity
-):
+class AdaptiveCoverSwitch(AdaptiveCoverBaseEntity, SwitchEntity, RestoreEntity):
     """Representation of a adaptive cover switch."""
-
-    _attr_has_entity_name = True
-    _attr_should_poll = False
 
     def __init__(
         self,
-        config_entry,
-        unique_id: str,
+        entry_id: str,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        coordinator: AdaptiveDataUpdateCoordinator,
         switch_name: str,
         initial_state: bool,
         key: str,
-        coordinator: AdaptiveDataUpdateCoordinator,
         device_class: SwitchDeviceClass | None = None,
     ) -> None:
         """Initialize the switch."""
-        super().__init__(coordinator=coordinator)
-        self.type = {
-            "cover_blind": "Vertical",
-            "cover_awning": "Horizontal",
-            "cover_tilt": "Tilt",
-        }
-        self._name = config_entry.data["name"]
+        super().__init__(entry_id, hass, config_entry, coordinator)
         self._state: bool | None = None
         self._key = key
         self._attr_translation_key = key
-        self._device_name = self.type[config_entry.data[CONF_SENSOR_TYPE]]
         self._switch_name = switch_name
         self._attr_device_class = device_class
         self._initial_state = initial_state
-        self._attr_unique_id = f"{unique_id}_{switch_name}"
-        self._device_id = unique_id
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._name,
-        )
+        self._attr_unique_id = f"{entry_id}_{switch_name}"
 
         self.coordinator.logger.debug("Setup switch")
 

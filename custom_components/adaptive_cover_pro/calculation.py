@@ -13,7 +13,16 @@ from numpy import cos, sin, tan
 from numpy import radians as rad
 
 from .config_context_adapter import ConfigContextAdapter
+from .const import (
+    CLIMATE_DEFAULT_TILT_ANGLE,
+    CLIMATE_SUMMER_TILT_ANGLE,
+    POSITION_CLOSED,
+    WINDOW_DEPTH_GAMMA_THRESHOLD,
+)
+from .enums import CoverType, TiltMode
+from .geometry import EdgeCaseHandler, SafetyMarginCalculator
 from .helpers import get_domain, get_safe_state
+from .position_utils import PositionConverter
 from .sun import SunData
 
 
@@ -45,11 +54,11 @@ class AdaptiveGeneralCover(ABC):
     max_elevation: int
     sun_data: SunData = field(init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Add solar data to dataset."""
         self.sun_data = SunData(self.timezone, self.hass)
 
-    def solar_times(self):
+    def solar_times(self) -> tuple[datetime | None, datetime | None]:
         """Determine start/end times."""
         df_today = pd.DataFrame(
             {
@@ -163,7 +172,7 @@ class AdaptiveGeneralCover(ABC):
             default = self.sunset_pos
         return default
 
-    def fov(self) -> list:
+    def fov(self) -> list[int]:
         """Return field of view."""
         return [self.azi_min_abs, self.azi_max_abs]
 
@@ -221,12 +230,15 @@ class NormalCoverState:
             state = self.cover.default
             self.cover.logger.debug("No sun in window: using default value (%s)", state)
 
-        result = np.clip(state, 0, 100)
-        if self.cover.apply_max_position and result > self.cover.max_pos:
-            return self.cover.max_pos
-        if self.cover.apply_min_position and result < self.cover.min_pos:
-            return self.cover.min_pos
-        return result
+        # Apply position limits using utility
+        return PositionConverter.apply_limits(
+            int(state),
+            self.cover.min_pos,
+            self.cover.max_pos,
+            self.cover.apply_min_position,
+            self.cover.apply_max_position,
+            dsv,
+        )
 
 
 @dataclass
@@ -254,7 +266,7 @@ class ClimateCoverData:
     _use_irradiance: bool
 
     @property
-    def outside_temperature(self):
+    def outside_temperature(self) -> str | float | None:
         """Get outside temperature."""
         temp = None
         if self.outside_entity:
@@ -267,7 +279,7 @@ class ClimateCoverData:
         return temp
 
     @property
-    def inside_temperature(self):
+    def inside_temperature(self) -> str | float | None:
         """Get inside temp from entity."""
         if self.temp_entity is not None:
             if get_domain(self.temp_entity) != "climate":
@@ -278,6 +290,7 @@ class ClimateCoverData:
             else:
                 temp = state_attr(self.hass, self.temp_entity, "current_temperature")
             return temp
+        return None
 
     @property
     def get_current_temperature(self) -> float | None:
@@ -290,7 +303,7 @@ class ClimateCoverData:
         return None
 
     @property
-    def is_presence(self):
+    def is_presence(self) -> bool:
         """Checks if people are present."""
         presence = None
         if self.presence_entity is not None:
@@ -398,7 +411,6 @@ class ClimateCoverState(NormalCoverState):
 
     def normal_type_cover(self) -> int:
         """Determine state for horizontal and vertical covers."""
-
         self.cover.logger.debug("Is presence? %s", self.climate_data.is_presence)
 
         if self.climate_data.is_presence:
@@ -458,8 +470,10 @@ class ClimateCoverState(NormalCoverState):
         if self.cover.valid:
             # Summer: partial closure for heat blocking
             if self.climate_data.is_summer:
-                self.cover.logger.debug("tilt_w_p(): Summer mode = 45 degrees")
-                return round((45 / degrees) * 100)
+                self.cover.logger.debug(
+                    "tilt_w_p(): Summer mode = %s degrees", CLIMATE_SUMMER_TILT_ANGLE
+                )
+                return round((CLIMATE_SUMMER_TILT_ANGLE / degrees) * 100)
 
             # Winter: Use calculated position for optimal light/heat
             if self.climate_data.is_winter:
@@ -479,9 +493,11 @@ class ClimateCoverState(NormalCoverState):
                 )
                 return super().get_state()
 
-        # Default: 80 degrees (mostly open)
-        self.cover.logger.debug("tilt_w_p(): Default = 80 degrees")
-        return round((80 / degrees) * 100)
+        # Default: mostly open for natural light
+        self.cover.logger.debug(
+            "tilt_w_p(): Default = %s degrees", CLIMATE_DEFAULT_TILT_ANGLE
+        )
+        return round((CLIMATE_DEFAULT_TILT_ANGLE / degrees) * 100)
 
     def tilt_without_presence(self, degrees: int) -> int:
         """Determine state for tilted blinds without occupants."""
@@ -490,19 +506,26 @@ class ClimateCoverState(NormalCoverState):
         if tilt_cover.valid:
             if self.climate_data.is_summer:
                 # block out all light in summer
-                return 0
-            if self.climate_data.is_winter and tilt_cover.mode == "mode2":
+                return POSITION_CLOSED
+            # Check for MODE2 (handles both string and enum)
+            is_mode2 = (
+                tilt_cover.mode == TiltMode.MODE2
+                or tilt_cover.mode == TiltMode.MODE2.value
+            )
+            if self.climate_data.is_winter and is_mode2:
                 # parallel to sun beams, not possible with single direction
                 return round((beta + 90) / degrees * 100)
-            return round((80 / degrees) * 100)
+            return round((CLIMATE_DEFAULT_TILT_ANGLE / degrees) * 100)
         return super().get_state()
 
-    def tilt_state(self):
+    def tilt_state(self) -> int:
         """Add tilt specific controls."""
         tilt_cover = cast(AdaptiveTiltCover, self.cover)
-        degrees = 90
-        if tilt_cover.mode == "mode2":
-            degrees = 180
+        # Check for MODE2 (handles both string and enum)
+        is_mode2 = (
+            tilt_cover.mode == TiltMode.MODE2 or tilt_cover.mode == TiltMode.MODE2.value
+        )
+        degrees = TiltMode.MODE2.max_degrees if is_mode2 else TiltMode.MODE1.max_degrees
         if self.climate_data.is_presence:
             return self.tilt_with_presence(degrees)
         return self.tilt_without_presence(degrees)
@@ -510,23 +533,30 @@ class ClimateCoverState(NormalCoverState):
     def get_state(self) -> int:
         """Return state."""
         result = self.normal_type_cover()
-        if self.climate_data.blind_type == "cover_tilt":
+        # Check if cover type is tilt (handles both string and enum)
+        is_tilt = (
+            self.climate_data.blind_type == CoverType.TILT
+            or self.climate_data.blind_type == CoverType.TILT.value
+        )
+        if is_tilt:
             result = self.tilt_state()
-        if self.cover.apply_max_position and result > self.cover.max_pos:
+
+        # Apply position limits using utility
+        final_result = PositionConverter.apply_limits(
+            result,
+            self.cover.min_pos,
+            self.cover.max_pos,
+            self.cover.apply_min_position,
+            self.cover.apply_max_position,
+            self.cover.direct_sun_valid,
+        )
+
+        if final_result != result:
             self.cover.logger.debug(
-                "Climate state: Max position applied (%s > %s)",
-                result,
-                self.cover.max_pos,
+                "Climate state: Position limit applied (%s -> %s)", result, final_result
             )
-            return self.cover.max_pos
-        if self.cover.apply_min_position and result < self.cover.min_pos:
-            self.cover.logger.debug(
-                "Climate state: Min position applied (%s < %s)",
-                result,
-                self.cover.min_pos,
-            )
-            return self.cover.min_pos
-        return result
+
+        return final_result
 
 
 @dataclass
@@ -542,9 +572,7 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
     def _calculate_safety_margin(self, gamma: float, sol_elev: float) -> float:
         """Calculate angle-dependent safety margin multiplier (≥1.0).
 
-        Increases blind extension at extreme angles to ensure effective sun blocking:
-        - Gamma margin: increases at extreme horizontal angles (>45°)
-        - Elevation margin: increases at very low (<10°) or high (>75°) angles
+        Delegates to SafetyMarginCalculator utility class.
 
         Args:
             gamma: Surface solar azimuth in degrees (-180 to 180)
@@ -554,31 +582,12 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
             Safety margin multiplier (1.0 to 1.45)
 
         """
-        margin = 1.0
-
-        # Gamma margin: increases at extreme horizontal angles
-        gamma_abs = abs(gamma)
-        if gamma_abs > 45:
-            t = (gamma_abs - 45) / 45  # 0 at 45°, 1 at 90°
-            t = np.clip(t, 0, 1)
-            smooth_t = t * t * (3 - 2 * t)  # Smoothstep interpolation
-            margin += 0.2 * smooth_t  # Up to 20% increase
-
-        # Elevation margin: increases at very low/high angles
-        if sol_elev < 10:
-            t = (10 - sol_elev) / 10
-            margin += 0.15 * np.clip(t, 0, 1)  # Up to 15% increase
-        elif sol_elev > 75:
-            t = (sol_elev - 75) / 15
-            margin += 0.1 * np.clip(t, 0, 1)  # Up to 10% increase
-
-        return margin
+        return SafetyMarginCalculator.calculate(gamma, sol_elev)
 
     def _handle_edge_cases(self) -> tuple[bool, float]:
         """Handle extreme angles with safe fallbacks.
 
-        Provides robust behavior at edge cases where standard geometric
-        calculations become unstable or inaccurate.
+        Delegates to EdgeCaseHandler utility class.
 
         Returns:
             Tuple of (is_edge_case: bool, position: float)
@@ -586,20 +595,9 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
             - position: Safe fallback position (only valid if is_edge_case=True)
 
         """
-        # Very low elevation: sun nearly horizontal, full coverage safest
-        if self.sol_elev < 2.0:
-            return (True, self.h_win)
-
-        # Extreme gamma: sun perpendicular to window, full coverage
-        if abs(self.gamma) > 85:
-            return (True, self.h_win)
-
-        # Very high elevation: sun nearly overhead, simplified calculation
-        if self.sol_elev > 88.0:
-            simple_height = self.distance * tan(rad(self.sol_elev))
-            return (True, np.clip(simple_height, 0, self.h_win))
-
-        return (False, 0.0)
+        return EdgeCaseHandler.check_and_handle(
+            self.sol_elev, self.gamma, self.distance, self.h_win
+        )
 
     def calculate_position(self) -> float:
         """Calculate blind height with enhanced geometric accuracy.
@@ -621,7 +619,7 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
 
         # Account for window depth at angles (creates additional shadow)
         effective_distance = self.distance
-        if self.window_depth > 0 and abs(self.gamma) > 10:
+        if self.window_depth > 0 and abs(self.gamma) > WINDOW_DEPTH_GAMMA_THRESHOLD:
             # At angles, window depth creates additional horizontal offset
             depth_contribution = self.window_depth * sin(rad(abs(self.gamma)))
             effective_distance += depth_contribution
@@ -642,8 +640,7 @@ class AdaptiveVerticalCover(AdaptiveGeneralCover):
         self.logger.debug(
             "Converting height to percentage: %s / %s * 100", position, self.h_win
         )
-        result = position / self.h_win * 100
-        return round(result)
+        return PositionConverter.to_percentage(position, self.h_win)
 
 
 @dataclass
@@ -668,8 +665,9 @@ class AdaptiveHorizontalCover(AdaptiveVerticalCover):
 
     def calculate_percentage(self) -> float:
         """Convert awn length to percentage or default value."""
-        result = self.calculate_position() / self.awn_length * 100
-        return round(result)
+        return PositionConverter.to_percentage(
+            self.calculate_position(), self.awn_length
+        )
 
 
 @dataclass
@@ -678,10 +676,10 @@ class AdaptiveTiltCover(AdaptiveGeneralCover):
 
     slat_distance: float
     depth: float
-    mode: str
+    mode: TiltMode | str  # Accept both TiltMode enum and string for backward compatibility
 
     @property
-    def beta(self):
+    def beta(self) -> float:
         """Calculate beta."""
         beta = np.arctan(tan(rad(self.sol_elev)) / cos(rad(self.gamma)))
         return beta
@@ -706,15 +704,17 @@ class AdaptiveTiltCover(AdaptiveGeneralCover):
 
         return result
 
-    def calculate_percentage(self):
+    def calculate_percentage(self) -> float:
         """Convert tilt angle to percentages or default value."""
-        # 0 degrees is closed, 90 degrees is open, 180 degrees is closed
-        percentage_single = self.calculate_position() / 90 * 100  # single directional
-        percentage_bi = self.calculate_position() / 180 * 100  # bi-directional
+        # 0 degrees is closed, 90 degrees is open (mode1), 180 degrees is closed (mode2)
+        position = self.calculate_position()
 
-        if self.mode == "mode1":
-            percentage = percentage_single
+        # Handle both string and TiltMode enum for backward compatibility
+        if isinstance(self.mode, TiltMode):
+            max_degrees = self.mode.max_degrees
         else:
-            percentage = percentage_bi
+            # Convert string to TiltMode
+            mode_enum = TiltMode(self.mode)
+            max_degrees = mode_enum.max_degrees
 
-        return round(percentage)
+        return PositionConverter.to_percentage(position, max_degrees)

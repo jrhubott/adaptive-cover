@@ -7,12 +7,11 @@ import asyncio
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import _LOGGER, CONF_ENTITIES, CONF_SENSOR_TYPE, DOMAIN
+from .const import _LOGGER, CONF_ENTITIES
 from .coordinator import AdaptiveDataUpdateCoordinator
+from .entity_base import AdaptiveCoverBaseEntity
 
 
 async def async_setup_entry(
@@ -21,12 +20,14 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the button platform."""
+    from .const import DOMAIN
+
     coordinator: AdaptiveDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
     ]
 
     reset_manual = AdaptiveCoverButton(
-        config_entry, config_entry.entry_id, "Reset Manual Override", coordinator
+        config_entry.entry_id, hass, config_entry, coordinator
     )
 
     buttons = []
@@ -38,39 +39,23 @@ async def async_setup_entry(
     async_add_entities(buttons)
 
 
-class AdaptiveCoverButton(
-    CoordinatorEntity[AdaptiveDataUpdateCoordinator], ButtonEntity
-):
+class AdaptiveCoverButton(AdaptiveCoverBaseEntity, ButtonEntity):
     """Representation of a adaptive cover button."""
 
-    _attr_has_entity_name = True
-    _attr_should_poll = False
     _attr_icon = "mdi:cog-refresh-outline"
 
     def __init__(
         self,
-        config_entry,
-        unique_id: str,
-        button_name: str,
+        entry_id: str,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
         coordinator: AdaptiveDataUpdateCoordinator,
     ) -> None:
         """Initialize the button."""
-        super().__init__(coordinator=coordinator)
-        self.type = {
-            "cover_blind": "Vertical",
-            "cover_awning": "Horizontal",
-            "cover_tilt": "Tilt",
-        }
-        self._name = config_entry.data["name"]
-        self._device_name = self.type[config_entry.data[CONF_SENSOR_TYPE]]
-        self._attr_unique_id = f"{unique_id}_{button_name}"
-        self._device_id = unique_id
-        self._button_name = button_name
+        super().__init__(entry_id, hass, config_entry, coordinator)
+        self._attr_unique_id = f"{entry_id}_Reset Manual Override"
+        self._button_name = "Reset Manual Override"
         self._entities = config_entry.options.get(CONF_ENTITIES, [])
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._name,
-        )
 
     @property
     def name(self):
