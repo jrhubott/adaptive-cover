@@ -29,11 +29,75 @@ If you're interested in contributing to this project, please see the **[Developm
 - **Release process** (automated with `./scripts/release`)
 - Code standards and best practices
 
+## Testing the Algorithms
+
+Want to visualize how the blinds will behave before installing? The **Jupyter notebook** (`notebooks/test_env.ipynb`) lets you test and visualize the position calculation algorithms without needing Home Assistant or physical covers.
+
+### Quick Start
+
+**1. Install Jupyter:**
+```bash
+pip install jupyter matplotlib pandas pvlib
+```
+
+**2. Run the notebook:**
+```bash
+# From the repository root
+jupyter notebook notebooks/test_env.ipynb
+```
+
+Or open in VS Code with the Jupyter extension installed.
+
+**3. Configure and run:**
+- Modify the configuration variables (location, window dimensions, orientation)
+- Run all cells (Cell → Run All)
+- Review the plots showing cover positions throughout the day
+
+### What You'll See
+
+The notebook generates two plots:
+- **Vertical Cover Plot** - Shows blind position based on sun position for up/down blinds
+- **Horizontal Cover Plot** - Shows awning extension for in/out awnings
+
+Each plot displays:
+- Sun elevation and azimuth over 24 hours
+- Calculated cover position overlaid
+- Sunrise/sunset times (red lines)
+- When sun enters/exits your window's field of view (yellow lines)
+
+### Example Configuration
+
+```python
+# Location (modify for your testing location)
+timezone = "America/New_York"  # Your timezone
+lat = 40.7128                  # Your latitude
+lon = -74.0060                 # Your longitude
+
+# Window properties
+windown_azimuth = 180          # 180 = South-facing
+window_fov_left = 90           # Field of view (degrees)
+window_fov_right = 90
+window_height = 3              # meters
+window_distance = 0.5          # Distance from window to blind (meters)
+```
+
+**Perfect for:**
+- Testing different window orientations before configuration
+- Experimenting with field of view angles
+- Validating behavior for your specific location
+- Understanding how the algorithm responds to sun position
+
+For detailed documentation, see the [Manual Testing section in CLAUDE.md](CLAUDE.md#manual-testing).
+
 ## Table of Contents
 
 - [Adaptive Cover Pro](#adaptive-cover-pro)
   - [Credits](#credits)
   - [For Developers](#for-developers)
+  - [Testing the Algorithms](#testing-the-algorithms)
+    - [Quick Start](#quick-start)
+    - [What You'll See](#what-youll-see)
+    - [Example Configuration](#example-configuration)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
   - [Known Limitations & Best Practices](#known-limitations--best-practices)
