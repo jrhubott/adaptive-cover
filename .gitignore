@@ -24,3 +24,4 @@ API.ipynb
 .DS_Store
 notebooks/test_python.ipynb
 .claude/
+notebooks/.ipynb_checkpoints

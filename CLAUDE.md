@@ -389,6 +389,8 @@ This applies to ALL commits (regular commits, merge commits, etc.) and release n
 
 **For comprehensive testing documentation, see [docs/UNIT_TESTS.md](docs/UNIT_TESTS.md)**
 
+For algorithm testing and visualization without Home Assistant, see [Manual Testing > Jupyter Notebook Testing](#jupyter-notebook-testing) section below.
+
 ### Running Tests
 
 **IMPORTANT:** Always activate the virtual environment first:
@@ -871,11 +873,332 @@ Users can monitor geometric accuracy via diagnostic sensors:
 
 ## Manual Testing
 
-- Use `./scripts/develop` to start test instance
-- Test config available in `config/configuration.yaml` with mock entities
-- Access Home Assistant UI at http://localhost:8123
-- `notebooks/test_env.ipynb` - Algorithm testing and visualization
-- `custom_components/adaptive_cover_pro/simulation/` - Simulation tools
+### Live Home Assistant Testing
+
+Use `./scripts/develop` to start a development instance with the integration loaded:
+
+```bash
+./scripts/develop
+```
+
+**What it does:**
+- Creates `config/` directory if not present
+- Sets `PYTHONPATH` to include `custom_components/`
+- Starts Home Assistant with debug logging
+- Loads the integration automatically
+- Uses `config/configuration.yaml` for test setup with mock entities
+
+**Access:**
+- Home Assistant UI: http://localhost:8123
+- Logs: Real-time debug output in terminal
+- Changes: Python file changes require restart to take effect
+
+### Jupyter Notebook Testing
+
+The `notebooks/` directory contains interactive Jupyter notebooks for algorithm testing and visualization **without requiring a full Home Assistant instance**.
+
+#### Purpose
+
+Notebooks enable rapid prototyping and testing of:
+- Position calculation algorithms (`AdaptiveVerticalCover`, `AdaptiveHorizontalCover`, `AdaptiveTiltCover`)
+- Sun position tracking and timing (using `SunData`)
+- Configuration parameter effects (window dimensions, FOV, blind spots)
+- Visual validation of cover behavior throughout the day
+
+**Why use notebooks?**
+- Faster iteration than testing through Home Assistant UI (seconds vs. minutes)
+- Immediate visual feedback via plots
+- Easy parameter experimentation
+- No need for physical covers or Home Assistant setup
+- Perfect for algorithm development and validation
+
+#### Setup
+
+**Option 1: Use development setup script (recommended)**
+```bash
+./scripts/setup  # Installs all dev dependencies including Jupyter
+```
+
+**Option 2: Manual installation**
+```bash
+source venv/bin/activate
+pip install ipykernel jupyter matplotlib pandas pvlib
+```
+
+**Dependencies installed:**
+- `ipykernel` - Jupyter kernel for Python 3.11+
+- `jupyter` - Jupyter notebook server
+- `matplotlib` - Plotting library
+- `pandas` - Data manipulation
+- `pvlib` - Solar position calculations (for advanced simulations)
+
+#### Running Notebooks
+
+**Option 1: Jupyter Notebook (classic interface)**
+```bash
+# From repository root
+jupyter notebook
+
+# Browser opens automatically at http://localhost:8888
+# Navigate to notebooks/test_env.ipynb
+```
+
+**Option 2: VS Code (recommended for developers)**
+```bash
+# Install VS Code Jupyter extension if not present
+code --install-extension ms-toolsai.jupyter
+
+# Open notebook directly in VS Code
+code notebooks/test_env.ipynb
+
+# Click "Run All" or run cells individually
+```
+
+**Option 3: JupyterLab (modern interface)**
+```bash
+pip install jupyterlab
+jupyter lab
+```
+
+#### Available Notebooks
+
+##### `notebooks/test_env.ipynb` - Algorithm Testing and Visualization
+
+**Purpose:** Interactive testing of vertical and horizontal cover calculations with visual output.
+
+**What it tests:**
+- Vertical blind calculations (`AdaptiveVerticalCover`)
+- Horizontal awning calculations (`AdaptiveHorizontalCover`)
+- Sun position tracking (azimuth, elevation)
+- Field of view determination
+- Sunrise/sunset timing
+
+**Outputs:**
+1. **Vertical Cover Plot:**
+   - Shows sun azimuth and elevation over 24 hours
+   - Overlays calculated vertical blind position
+   - Highlights sunrise, sunset, and "sun in front" periods
+
+2. **Horizontal Cover Plot:**
+   - Same sun position data
+   - Overlays calculated awning extension
+   - Uses awning-specific parameters (length, angle)
+
+**Key Configuration Variables:**
+
+```python
+# Location (modify for your testing location)
+timezone = "CET"                 # Time zone string
+lat = 51.5616455078125          # Latitude
+lon = 5.08446288184867          # Longitude
+
+# Window properties
+window_height = 3               # meters
+window_distance = 0.5           # meters (distance from window to blind)
+windown_azimuth = 180           # degrees (south-facing)
+window_fov_left = 90            # degrees (field of view left)
+window_fov_right = 90           # degrees (field of view right)
+
+# Cover properties (vertical)
+maximum_position = 100          # percent
+default_height = 60             # percent (position when sun not in front)
+
+# Cover properties (horizontal)
+cover_awning_length = 2         # meters
+cover_awning_angle = 0          # degrees (mounting angle)
+```
+
+**How to use:**
+1. Open notebook in Jupyter or VS Code
+2. Modify configuration variables (location, window properties)
+3. Run all cells (Cell → Run All)
+4. Review plots:
+   - Check if cover opens/closes at expected times
+   - Verify sun enters/exits FOV at reasonable hours
+   - Confirm cover position looks appropriate for sun angles
+
+**Example workflow:**
+```python
+# Test extreme FOV (wide windows)
+window_fov_left = 120
+window_fov_right = 120
+
+# Test narrow FOV (small windows)
+window_fov_left = 30
+window_fov_right = 30
+
+# Test different orientations
+windown_azimuth = 90  # East-facing
+windown_azimuth = 270  # West-facing
+```
+
+#### Mock Objects Reference
+
+The notebook uses simplified mock objects to satisfy API requirements:
+
+**`MockedHass`** - Simulates Home Assistant instance
+```python
+class MockedHass:
+    class MockedConfig:
+        latitude = lat
+        longitude = lon
+        time_zone = timezone
+        elevation = 0
+
+    config = MockedConfig()
+    data = {}
+```
+
+**`MockedLogger`** - Simulates ConfigContextAdapter
+```python
+class MockedLogger:
+    """No-op logger that satisfies the API contract."""
+    def debug(self, msg, *args, **kwargs): pass
+    def info(self, msg, *args, **kwargs): pass
+    def warning(self, msg, *args, **kwargs): pass
+    def error(self, msg, *args, **kwargs): pass
+    config_name = "Notebook Test"
+```
+
+These mocks allow calculation classes to run without a full Home Assistant installation while maintaining API compatibility.
+
+#### Maintenance
+
+**Current Status:** Notebook is functional and up-to-date with v2.7.0+ codebase.
+
+**When to Update:**
+1. After changing calculation algorithms in `calculation.py`
+2. After modifying dataclass signatures:
+   - `AdaptiveGeneralCover` (lines 29-54)
+   - `AdaptiveVerticalCover` (lines 859-866)
+   - `AdaptiveHorizontalCover` (lines 959-964)
+   - `AdaptiveTiltCover` (lines 1009-1015)
+3. After changing `SunData` API (`sun.py` line 13)
+4. After adding new required parameters
+
+**How to Verify:**
+```bash
+# Open notebook
+jupyter notebook notebooks/test_env.ipynb
+
+# Run all cells (Cell → Run All)
+# Verify:
+# ✓ No import errors
+# ✓ No AttributeError about missing parameters
+# ✓ Two plots appear (vertical and horizontal)
+# ✓ Plots show reasonable behavior
+```
+
+**Known Limitations:**
+- Only tests vertical and horizontal covers (tilt not included yet)
+- Uses basic mode only (climate mode not tested)
+- Mock objects are minimal (no state management, no entity tracking)
+- Sun position calculated for full 24 hours (5-minute intervals)
+
+### Simulation Tools
+
+The `custom_components/adaptive_cover_pro/simulation/` directory contains visualization outputs:
+
+**`simulation/sim_plot.png`** - Example plot showing cover behavior over time
+
+**How it's generated:**
+- Cells 5-14 in `test_env.ipynb` (currently commented out)
+- Uses `pvlib` for detailed solar position calculations
+- Produces publication-quality plots with multiple blind types
+- Saves output to `simulation/sim_plot.png`
+
+**To regenerate:**
+```python
+# In test_env.ipynb, uncomment cells 5-14
+# Adjust parameters:
+start_date = date.today()
+end_date = start_date + timedelta(days=1)
+
+# Run cells
+# Output saved to custom_components/adaptive_cover_pro/simulation/sim_plot.png
+```
+
+### Development Workflow Integration
+
+**Recommended workflow for algorithm changes:**
+
+```
+1. CODE CHANGE
+   ↓
+   Edit calculation.py (e.g., modify safety margins)
+
+2. QUICK VALIDATION (seconds)
+   ↓
+   Open notebooks/test_env.ipynb
+   Adjust test parameters (sun angles, window config)
+   Run cells → Check plots
+   Iterate until behavior looks correct
+
+3. UNIT TESTING (minutes)
+   ↓
+   Add tests to tests/test_calculation.py
+   Run: source venv/bin/activate && python -m pytest tests/ -v
+   Verify edge cases and regressions
+
+4. INTEGRATION TESTING (hours)
+   ↓
+   Run ./scripts/develop
+   Test with actual covers through Home Assistant UI
+   Monitor debug logs for issues
+   Test with various sun positions
+
+5. COMMIT
+   ↓
+   git add . && git commit -m "feat: Improve safety margins"
+   Create PR for review
+```
+
+**Benefits of this workflow:**
+- **Notebooks catch obvious bugs quickly** (immediate visual feedback)
+- **Unit tests verify correctness systematically** (comprehensive coverage)
+- **Live testing confirms real-world behavior** (actual covers + real sun data)
+- **Reduces iteration time** compared to testing exclusively in Home Assistant
+- **Documents expected behavior** through visualizations
+
+**Example: Testing new geometric accuracy features**
+```python
+# In notebook, test window_depth parameter
+window_depth = 0.0   # Baseline (Phase 1)
+window_depth = 0.1   # 10cm reveal
+window_depth = 0.3   # 30cm deep frame
+
+# Compare plots to see effect of window depth on position calculations
+# Verify position increases at extreme gamma angles
+# Check smooth transitions across angle ranges
+```
+
+### Troubleshooting
+
+**Import errors:**
+```python
+ModuleNotFoundError: No module named 'adaptive_cover_pro'
+```
+**Solution:** Ensure `sys.path.append("../custom_components")` is in first cell and repository structure is correct.
+
+**Parameter errors:**
+```python
+TypeError: __init__() missing 1 required positional argument: 'logger'
+```
+**Solution:** Add `MockedLogger` class and pass `logger=mocked_logger` to cover constructors.
+
+**Plot not appearing:**
+```python
+# No output after running plot cells
+```
+**Solution:**
+- In Jupyter: Add `%matplotlib inline` to first cell
+- In VS Code: Ensure Jupyter extension is installed and notebook kernel is running
+
+**SunData errors:**
+```python
+TypeError: __init__() got an unexpected keyword argument 'hass'
+```
+**Solution:** Change `SunData(hass=mocked_hass, timezone=timezone)` to `SunData(timezone, mocked_hass)` (positional args, timezone first).
 
 ## File Organization
 
