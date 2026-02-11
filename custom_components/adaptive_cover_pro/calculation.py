@@ -262,39 +262,41 @@ class AdaptiveGeneralCover(ABC):
 
     @property
     def apply_min_position(self) -> bool:
-        """Check if minimum position limit should be applied.
+        """Check if minimum position limit should be applied conditionally.
 
         Min position prevents cover from being too open. Can be configured to
         always apply or only when sun is directly in front.
 
         Returns:
-            True if min_pos configured and applicable. False if not configured
-            or set to 0 (no limit).
+            False if limit should always be applied (unconditional).
+            True if limit should only apply during direct sun tracking (conditional).
+            False if no limit configured (handled by min_pos check in apply_limits).
 
         """
         if self.min_pos is not None and self.min_pos != 0:
             if self.min_pos_bool:
-                return self.direct_sun_valid
-            return True
-        return False
+                return True  # Conditional - only when sun_valid in apply_limits
+            return False  # Always apply
+        return False  # No limit configured (doesn't matter, min_pos is 0/None)
 
     @property
     def apply_max_position(self) -> bool:
-        """Check if maximum position limit should be applied.
+        """Check if maximum position limit should be applied conditionally.
 
         Max position prevents cover from being too closed. Can be configured to
         always apply or only when sun is directly in front.
 
         Returns:
-            True if max_pos configured and applicable. False if not configured
-            or set to 100 (no limit).
+            False if limit should always be applied (unconditional).
+            True if limit should only apply during direct sun tracking (conditional).
+            False if no limit configured (handled by max_pos check in apply_limits).
 
         """
         if self.max_pos is not None and self.max_pos != 100:
             if self.max_pos_bool:
-                return self.direct_sun_valid
-            return True
-        return False
+                return True  # Conditional - only when sun_valid in apply_limits
+            return False  # Always apply
+        return False  # No limit configured (doesn't matter, max_pos is 100/None)
 
     @property
     def direct_sun_valid(self) -> bool:
@@ -308,7 +310,7 @@ class AdaptiveGeneralCover(ABC):
             False otherwise.
 
         """
-        return (self.valid) & (not self.sunset_valid) & (not self.is_sun_in_blind_spot)
+        return self.valid and not self.sunset_valid and not self.is_sun_in_blind_spot
 
     @abstractmethod
     def calculate_position(self) -> float:
