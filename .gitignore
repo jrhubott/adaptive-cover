@@ -25,3 +25,4 @@ API.ipynb
 notebooks/test_python.ipynb
 .claude/
 notebooks/.ipynb_checkpoints
+notebooks/outputs/

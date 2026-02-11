@@ -1,0 +1,42 @@
+name: Notebook Validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feature/*
+
+jobs:
+  validate-notebook:
+    name: Validate Jupyter Notebook
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Execute notebook
+        run: |
+          cd notebooks
+          jupyter nbconvert --to notebook --execute --inplace test_env.ipynb
+
+      - name: Upload generated plots
+        if: always()  # Upload even if notebook fails (might have partial plots)
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebook-plots
+          path: notebooks/outputs/*.png
+          if-no-files-found: warn
+          retention-days: 30
