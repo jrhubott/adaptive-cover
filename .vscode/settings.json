@@ -109,5 +109,8 @@
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
 
-  "fabric8analytics.exhortignore": ["**/venv/**"]
+  "fabric8analytics.exhortignore": [
+    "**/venv/**"
+  ],
+  "python-envs.pythonProjects": []
 }
