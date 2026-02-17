@@ -867,6 +867,9 @@ Users can monitor geometric accuracy via diagnostic sensors:
     - False (default): Limits always enforced
     - True: Limits only during direct sun tracking
 - Automation settings (delta position/time, start/end times, manual override)
+- Force override settings:
+  - `force_override_sensors` - Optional list of binary sensor entity IDs that globally disable automatic control when any sensor is "on"
+  - `force_override_position` - Position (0-100%) to move covers to when force override is active (default: 0%)
 - Climate settings (temperature entities/thresholds, presence, weather)
 - Light settings (lux/irradiance entities and thresholds)
 - Blind spot areas

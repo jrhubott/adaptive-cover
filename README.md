@@ -153,6 +153,12 @@ For detailed documentation, see the [Manual Testing section in CLAUDE.md](CLAUDE
   - Set start time to prevent opening blinds while you are asleep
   - Set minimum interval time between position changes
   - Set minimum percentage change
+  - **Force Override Sensors** - Weather safety protection
+    - Configure binary sensors (rain, wind, etc.) that override automatic control
+    - When ANY sensor is active, ALL covers move to a configured safe position
+    - Default position: 0% (fully retracted/closed) for rain/wind protection
+    - Customizable position: Set to 100% for security sensors (emergency access)
+    - Manual control still works during force override
   - **Automatic Position Verification** (built-in reliability feature)
     - Periodically verifies covers reached the positions we sent them to (every 2 minutes)
     - Automatically retries failed position commands (up to 3 attempts)

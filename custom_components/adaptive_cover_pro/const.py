@@ -44,6 +44,8 @@ CONF_MIN_POSITION = "min_position"
 CONF_ENABLE_MAX_POSITION = "enable_max_position"
 CONF_ENABLE_MIN_POSITION = "enable_min_position"
 CONF_OUTSIDETEMP_ENTITY = "outside_temp"
+CONF_FORCE_OVERRIDE_SENSORS = "force_override_sensors"
+CONF_FORCE_OVERRIDE_POSITION = "force_override_position"
 CONF_ENABLE_BLIND_SPOT = "blind_spot"
 CONF_BLIND_SPOT_RIGHT = "blind_spot_right"
 CONF_BLIND_SPOT_LEFT = "blind_spot_left"
@@ -142,6 +144,8 @@ DIRECT_MAPPING_FIELDS = [
     CONF_IRRADIANCE_ENTITY,
     CONF_IRRADIANCE_THRESHOLD,
     CONF_OUTSIDE_THRESHOLD,
+    CONF_FORCE_OVERRIDE_SENSORS,
+    CONF_FORCE_OVERRIDE_POSITION,
     CONF_END_TIME,
     CONF_END_ENTITY,
     CONF_RETURN_SUNSET,
@@ -176,6 +180,7 @@ class ControlStatus:
     MANUAL_OVERRIDE = "manual_override"
     AUTOMATIC_CONTROL_OFF = "automatic_control_off"
     SUN_NOT_VISIBLE = "sun_not_visible"
+    FORCE_OVERRIDE_ACTIVE = "force_override_active"
 
 
 # Geometric accuracy constants (used in calculation.py for safety margins and edge cases)

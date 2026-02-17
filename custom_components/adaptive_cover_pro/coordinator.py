@@ -67,6 +67,8 @@ from .const import (
     CONF_END_ENTITY,
     CONF_END_TIME,
     CONF_ENTITIES,
+    CONF_FORCE_OVERRIDE_POSITION,
+    CONF_FORCE_OVERRIDE_SENSORS,
     CONF_FOV_LEFT,
     CONF_FOV_RIGHT,
     CONF_INTERP,
@@ -280,6 +282,30 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
     def is_awning_cover(self) -> bool:
         """Check if this is a horizontal awning."""
         return self._cover_type == "cover_awning"
+
+    @property
+    def is_force_override_active(self) -> bool:
+        """Check if any force override sensor is active.
+
+        Returns:
+            True if any configured force override sensor is in "on" state
+
+        """
+        sensors = self.config_entry.options.get(CONF_FORCE_OVERRIDE_SENSORS, [])
+        if not sensors:
+            return False
+
+        for sensor in sensors:
+            state = self.hass.states.get(sensor)
+            if state and state.state == "on":
+                self.logger.debug(
+                    "Force override sensor %s is active (state: %s)",
+                    sensor,
+                    state.state,
+                )
+                return True
+
+        return False
 
     def _read_position_with_capabilities(
         self, entity: str, caps: dict[str, bool], state_obj: State | None = None
@@ -1524,6 +1550,11 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
                 "enable_max_position": options.get(CONF_ENABLE_MAX_POSITION, False),
                 "inverse_state": options.get(CONF_INVERSE_STATE, False),
                 "interpolation": options.get(CONF_INTERP, False),
+                "force_override_sensors": options.get(CONF_FORCE_OVERRIDE_SENSORS, []),
+                "force_override_position": options.get(
+                    CONF_FORCE_OVERRIDE_POSITION, 0
+                ),
+                "force_override_active": self.is_force_override_active,
             }
         }
 
@@ -1552,12 +1583,16 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
         """Determine current control status.
 
         Returns:
-            Control status string: AUTOMATIC_CONTROL_OFF, MANUAL_OVERRIDE,
-            OUTSIDE_TIME_WINDOW, SUN_NOT_VISIBLE, or ACTIVE
+            Control status string: AUTOMATIC_CONTROL_OFF, FORCE_OVERRIDE_ACTIVE,
+            MANUAL_OVERRIDE, OUTSIDE_TIME_WINDOW, SUN_NOT_VISIBLE, or ACTIVE
 
         """
         if not self.automatic_control:
             return ControlStatus.AUTOMATIC_CONTROL_OFF
+
+        # Check force override sensors (safety override takes precedence)
+        if self.is_force_override_active:
+            return ControlStatus.FORCE_OVERRIDE_ACTIVE
 
         if self.manager.binary_cover_manual:
             return ControlStatus.MANUAL_OVERRIDE
@@ -1574,16 +1609,29 @@ class AdaptiveDataUpdateCoordinator(DataUpdateCoordinator[AdaptiveCoverData]):
 
     @property
     def state(self) -> int:
-        """Get final state with climate mode and interpolation.
+        """Get final state with climate mode, interpolation, and force override.
 
-        Determines final cover position by selecting between default and climate
-        state based on switch_mode, then applying interpolation and inverse_state
-        transformations if configured.
+        Determines final cover position by:
+        1. Checking force override (highest priority)
+        2. Selecting between default and climate state based on switch_mode
+        3. Applying interpolation and inverse_state transformations if configured
 
         Returns:
             Final calculated cover position (0-100)
 
         """
+        # Check force override first (highest priority)
+        if self.is_force_override_active:
+            override_position = self.config_entry.options.get(
+                CONF_FORCE_OVERRIDE_POSITION, 0
+            )
+            self.logger.debug(
+                "Force override active - using position: %s",
+                override_position,
+            )
+            return override_position
+
+        # Normal position calculation
         self.logger.debug(
             "Basic position: %s; Climate position: %s; Using climate position? %s",
             self.default_state,
