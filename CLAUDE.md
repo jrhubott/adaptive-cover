@@ -717,6 +717,117 @@ class MyDiagnosticSensor(AdaptiveCoverDiagnosticSensor):
 - ✅ History is still recorded for debugging
 - ❌ Don't use empty unit for numeric sensors (breaks statistics)
 
+### Motion Control Pattern
+
+**Added in v2.7.5** - Occupancy-based automatic control with debouncing.
+
+Motion control enables/disables automatic sun positioning based on room occupancy using binary motion sensors.
+
+**Key Design:**
+- **OR Logic** - ANY sensor detecting motion enables automatic positioning
+- **Debounce "no motion" only** - Immediate response when motion detected, timeout when motion stops
+- **Priority**: Force override (safety) > Motion timeout > Manual override
+- **Asyncio task-based** - Similar to grace period pattern for clean timeout management
+
+**Implementation (coordinator.py):**
+
+```python
+# Properties
+@property
+def is_motion_detected(self) -> bool:
+    """Check if ANY motion sensor is 'on' (OR logic)."""
+    sensors = self.config_entry.options.get(CONF_MOTION_SENSORS, [])
+    if not sensors:
+        return True  # Feature disabled, assume presence
+
+    for sensor in sensors:
+        state = self.hass.states.get(sensor)
+        if state and state.state == "on":
+            return True
+    return False
+
+@property
+def is_motion_timeout_active(self) -> bool:
+    """Check if timeout expired (no motion for configured duration)."""
+    sensors = self.config_entry.options.get(CONF_MOTION_SENSORS, [])
+    if not sensors:
+        return False  # Feature disabled
+    return self._motion_timeout_active
+
+# Event handler with debouncing
+async def async_check_motion_state_change(self, event):
+    """Handle motion sensor state changes.
+
+    Motion detected (on) → immediate response, cancel timeout
+    Motion stopped (off) → start timeout if no other sensors active
+    """
+    if new_state.state == "on":
+        self._cancel_motion_timeout()
+        if self._motion_timeout_active:
+            self._motion_timeout_active = False
+            self.state_change = True
+            await self.async_refresh()
+
+    elif new_state.state == "off":
+        if not self.is_motion_detected:  # All sensors off
+            self._start_motion_timeout()
+
+# Timeout management (asyncio task)
+def _start_motion_timeout(self) -> None:
+    """Start timeout for no-motion detection."""
+    self._cancel_motion_timeout()
+    timeout_seconds = self.config_entry.options.get(CONF_MOTION_TIMEOUT, DEFAULT_MOTION_TIMEOUT)
+    self._motion_timeout_task = asyncio.create_task(self._motion_timeout_handler(timeout_seconds))
+
+async def _motion_timeout_handler(self, timeout_seconds: int) -> None:
+    """Handle timeout expiration."""
+    await asyncio.sleep(timeout_seconds)
+
+    # Double-check motion state after timeout
+    if self.is_motion_detected:
+        return
+
+    self._motion_timeout_active = True
+    self.state_change = True
+    await self.async_refresh()
+
+def _cancel_motion_timeout(self) -> None:
+    """Cancel timeout task."""
+    if self._motion_timeout_task and not self._motion_timeout_task.done():
+        self._motion_timeout_task.cancel()
+    self._motion_timeout_task = None
+
+# Priority in state property
+@property
+def state(self) -> int:
+    """Get final state with priorities."""
+    # 1. Force override (highest priority - safety)
+    if self.is_force_override_active:
+        return self.config_entry.options.get(CONF_FORCE_OVERRIDE_POSITION, 0)
+
+    # 2. Motion timeout (second priority)
+    if self.is_motion_timeout_active:
+        return self.default_state
+
+    # 3. Normal position calculation...
+```
+
+**Use Cases:**
+- **Glare control when present** - Use sun positioning when someone is in the room
+- **Energy savings when away** - Return to default (closed) when room is empty
+- **Privacy when unoccupied** - Close covers automatically after no motion
+- **Multi-room coverage** - OR logic means ANY room with motion uses automatic
+
+**Testing:**
+- See `tests/test_motion_control.py` for 22 comprehensive test cases
+- Tests cover OR logic, debouncing, priority, edge cases, shutdown cleanup
+
+**Edge Cases Handled:**
+- Unavailable sensors treated as "off" (no motion)
+- Empty sensor list disables feature (backward compatible)
+- Double-check prevents false timeout if motion detected during sleep
+- Cleanup cancels task on shutdown or config change
+
 ### Inverse State Behavior
 
 **CRITICAL: Do Not Change This Behavior**
@@ -867,6 +978,12 @@ Users can monitor geometric accuracy via diagnostic sensors:
     - False (default): Limits always enforced
     - True: Limits only during direct sun tracking
 - Automation settings (delta position/time, start/end times, manual override)
+- Force override settings:
+  - `force_override_sensors` - Optional list of binary sensor entity IDs that globally disable automatic control when any sensor is "on"
+  - `force_override_position` - Position (0-100%) to move covers to when force override is active (default: 0%)
+- Motion control settings:
+  - `motion_sensors` - Optional list of binary sensor entity IDs for occupancy-based control. When ANY sensor detects motion, covers use automatic positioning. When ALL sensors show no motion for timeout duration, covers return to default position. Empty list = feature disabled (default: [])
+  - `motion_timeout` - Duration in seconds to wait after last motion before using default position. Debounces rapid sensor toggling (range: 30-3600, default: 300)
 - Climate settings (temperature entities/thresholds, presence, weather)
 - Light settings (lux/irradiance entities and thresholds)
 - Blind spot areas
