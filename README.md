@@ -159,6 +159,14 @@ For detailed documentation, see the [Manual Testing section in CLAUDE.md](CLAUDE
     - Default position: 0% (fully retracted/closed) for rain/wind protection
     - Customizable position: Set to 100% for security sensors (emergency access)
     - Manual control still works during force override
+  - **Motion-Based Automatic Control** - Occupancy-based automation
+    - Configure motion sensors to enable/disable sun positioning based on room occupancy
+    - When ANY sensor detects motion, covers use automatic sun-based positioning
+    - When ALL sensors show no motion for configured timeout, covers return to default position
+    - Debouncing prevents position flapping from rapid sensor toggling (30-3600 seconds, default 300)
+    - OR logic for multiple sensors - ANY room with motion enables automatic positioning
+    - Use cases: Glare control when present, energy savings when away, privacy when unoccupied
+    - Optional feature - leave sensor list empty to disable
   - **Automatic Position Verification** (built-in reliability feature)
     - Periodically verifies covers reached the positions we sent them to (every 2 minutes)
     - Automatically retries failed position commands (up to 3 attempts)
@@ -835,6 +843,9 @@ Interpolated List: [100, 75, 50, 25, 0]
 | End Time                                   | `"00:00:00"` |       | Latest time a cover can be adjusted each day                                                   |
 | End Time Entity                            | None         |       | The latest moment a cover may be changed . _Overrides the `end_time` value_                    |
 | Adjust at end time                         | `False`      |       | Make sure to always update the position to the default setting at the end time.                |
+| **Motion Sensors** (Occupancy-based control) |   |   |   |
+| Motion Sensors for Occupancy Control       | None (empty) |       | List of binary sensors that control sun positioning based on room occupancy. When ANY sensor detects motion, covers use automatic positioning. When ALL sensors show no motion for the timeout duration, covers return to default position. Leave empty to disable feature. |
+| Motion Timeout Duration                    | `300`        | 30-3600 | Duration (in seconds) to wait after last motion before returning covers to default position. Prevents rapid position changes when motion sensors toggle frequently. Default: 300 seconds (5 minutes). |
 
 ### Climate
 
@@ -905,7 +916,7 @@ These sensors are created when diagnostics are enabled in automation settings. T
 | `sensor.{device_name}_sun_azimuth` | Enabled | Current sun azimuth angle in degrees (0-360°). Verify window azimuth configuration. |
 | `sensor.{device_name}_sun_elevation` | Enabled | Current sun elevation angle in degrees. Debug elevation constraints and blind spots. |
 | `sensor.{device_name}_gamma` | Enabled | Surface solar azimuth - sun angle relative to window (most critical for troubleshooting). |
-| `sensor.{device_name}_control_status` | Enabled | Shows why covers aren't moving: `active`, `outside_time_window`, `manual_override`, `automatic_control_off`, `sun_not_visible`, etc. |
+| `sensor.{device_name}_control_status` | Enabled | Shows why covers aren't moving: `active`, `outside_time_window`, `manual_override`, `automatic_control_off`, `sun_not_visible`, `force_override_active`, `motion_timeout`, etc. |
 | `sensor.{device_name}_calculated_position` | Enabled | Raw calculated position before interpolation/inversion adjustments. |
 | `sensor.{device_name}_last_cover_action` | Enabled | Tracks the most recent cover action: service called, entity controlled, timestamp. Attributes include position sent, threshold used (for open/close-only covers), and whether inverse_state was applied. Useful for debugging. |
 | `sensor.{device_name}_last_position_verification` | Disabled | Timestamp of the last position verification check. Attributes show per-entity verification times. |

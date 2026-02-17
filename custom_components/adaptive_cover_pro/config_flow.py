@@ -59,6 +59,8 @@ from .const import (
     CONF_MIN_ELEVATION,
     CONF_MIN_POSITION,
     CONF_MODE,
+    CONF_MOTION_SENSORS,
+    CONF_MOTION_TIMEOUT,
     CONF_OPEN_CLOSE_THRESHOLD,
     CONF_OUTSIDE_THRESHOLD,
     CONF_OUTSIDETEMP_ENTITY,
@@ -80,6 +82,7 @@ from .const import (
     CONF_WEATHER_ENTITY,
     CONF_WEATHER_STATE,
     CONF_WINDOW_DEPTH,
+    DEFAULT_MOTION_TIMEOUT,
     DIRECT_MAPPING_FIELDS,
     DOMAIN,
     LEGACY_DOMAIN,
@@ -483,6 +486,22 @@ AUTOMATION_CONFIG = vol.Schema(
                 unit_of_measurement="%",
             )
         ),
+        vol.Optional(CONF_MOTION_SENSORS, default=[]): selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain=["binary_sensor"],
+                multiple=True,
+                device_class="motion",
+            )
+        ),
+        vol.Optional(CONF_MOTION_TIMEOUT, default=DEFAULT_MOTION_TIMEOUT): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=30,
+                max=3600,
+                step=30,
+                mode=selector.NumberSelectorMode.BOX,
+                unit_of_measurement="seconds",
+            )
+        ),
         vol.Optional(CONF_RETURN_SUNSET, default=False): selector.BooleanSelector(),
         vol.Optional(
             CONF_ENABLE_DIAGNOSTICS, default=False
@@ -872,6 +891,10 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 CONF_FORCE_OVERRIDE_POSITION: self.config.get(
                     CONF_FORCE_OVERRIDE_POSITION, 0
                 ),
+                CONF_MOTION_SENSORS: self.config.get(CONF_MOTION_SENSORS, []),
+                CONF_MOTION_TIMEOUT: self.config.get(
+                    CONF_MOTION_TIMEOUT, DEFAULT_MOTION_TIMEOUT
+                ),
                 CONF_MANUAL_OVERRIDE_DURATION: self.config.get(
                     CONF_MANUAL_OVERRIDE_DURATION
                 ),
@@ -947,6 +970,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             (CONF_IRRADIANCE_ENTITY, "Irradiance"),
             (CONF_OUTSIDETEMP_ENTITY, "Outside temperature"),
             (CONF_FORCE_OVERRIDE_SENSORS, "Force override sensors"),
+            (CONF_MOTION_SENSORS, "Motion sensors"),
         ]
 
         for conf_key, label in optional_entities:
@@ -1222,6 +1246,7 @@ class OptionsFlowHandler(OptionsFlow):
                 CONF_END_ENTITY,
                 CONF_MANUAL_THRESHOLD,
                 CONF_FORCE_OVERRIDE_SENSORS,
+                CONF_MOTION_SENSORS,
             ]
             self.optional_entities(entities, user_input)
             self.options.update(user_input)
